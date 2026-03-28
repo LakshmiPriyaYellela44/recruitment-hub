@@ -131,3 +131,21 @@ backend/storage/
 
 # AWS setup/test files (temporary)
 backend/setup_db_user.sql
+
+# Backend documentation files (not needed in repo)
+backend/*.md
+
+# Backend test/diagnostic Python files (not needed in repo)
+backend/*test*.py
+backend/*check*.py
+backend/*debug*.py
+backend/*diagnose*.py
+backend/direct_test.py
+backend/e2e_*.py
+backend/final_verification.py
+backend/full_schema_check.py
+backend/get_profile_error.py
+backend/quick_check.py
+backend/simple_diagnostic.py
+backend/step_by_step_test.py
+backend/comprehensive_*.py

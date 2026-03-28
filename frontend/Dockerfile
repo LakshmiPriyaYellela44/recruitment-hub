@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN npm ci
 COPY . .
 
 # Install additional dependencies
-RUN npm install -D tailwindcss postcss autoprefixer
+RUN npm install -D tailwindcss @tailwindcss/postcss postcss autoprefixer
 
 # Build application
 RUN npm run build
@@ -22,3 +22,4 @@ EXPOSE 5173
 
 # Run application
 CMD ["npm", "run", "preview"]
+ 

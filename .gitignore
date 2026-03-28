@@ -40,6 +40,10 @@ htmlcov/
 # OS
 Thumbs.db
 
+# Documentation (markdown files)
+*.md
+!README.md
+
 # Logs & temp outputs
 *.log
 logs/

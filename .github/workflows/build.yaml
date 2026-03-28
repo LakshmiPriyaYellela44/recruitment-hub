@@ -7,8 +7,8 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_FRONTEND_REPO: rca-frontend
-  ECR_BACKEND_REPO: rca-backend
+  ECR_FRONTEND_REPO: ${{ env.ECS_SERVICE_FRONTEND }}
+  ECR_BACKEND_REPO: ${{ env.ECS_SERVICE_BACKEND }}
   ECS_CLUSTER: rca-prod-cluster
   ECS_SERVICE_FRONTEND: frontend-service
   ECS_SERVICE_BACKEND: backend-service
@@ -58,7 +58,7 @@ jobs:
           IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND_REPO }}:latest
           TASK_DEF=$(cat <<EOF
           {
-            "family": "${{ env.ECS_SERVICE_BACKEND}}",
+            "family": "${{ env.ECS_SERVICE_BACKEND }}",
             "networkMode": "awsvpc",
             "containerDefinitions": [
               {
@@ -92,7 +92,8 @@ jobs:
           EOF
           )
           echo "$TASK_DEF" > be-task.json
-          aws ecs register-task-definition --cli-input-json file://be-task.json
+          BE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://be-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "BE_TASK_ARN=$BE_TASK_ARN" >> $GITHUB_ENV
 
       - name: Deploy or Create Backend Service
         run: |
@@ -109,13 +110,13 @@ jobs:
             aws ecs update-service \
               --cluster ${{ env.ECS_CLUSTER }} \
               --service ${{ env.ECS_SERVICE_BACKEND }} \
-              --task-definition ${{ env.ECS_SERVICE_BACKEND }} \
+              --task-definition ${{ env.BE_TASK_ARN }} \
               --force-new-deployment
           else
             aws ecs create-service \
               --cluster ${{ env.ECS_CLUSTER }} \
               --service-name ${{ env.ECS_SERVICE_BACKEND }} \
-              --task-definition ${{ env.ECS_SERVICE_BACKEND }} \
+              --task-definition ${{ env.BE_TASK_ARN }} \
               --desired-count 1 \
               --launch-type FARGATE \
               --network-configuration "awsvpcConfiguration={subnets=[${CLEAN_SUBNETS}],securityGroups=[${{ env.APP_SG_ID }}],assignPublicIp=ENABLED}" \
@@ -157,7 +158,8 @@ jobs:
           EOF
           )
           echo "$TASK_DEF" > fe-task.json
-          aws ecs register-task-definition --cli-input-json file://fe-task.json
+          FE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://fe-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "FE_TASK_ARN=$FE_TASK_ARN" >> $GITHUB_ENV
 
       - name: Deploy or Create Frontend Service
         run: |
@@ -174,13 +176,13 @@ jobs:
             aws ecs update-service \
               --cluster ${{ env.ECS_CLUSTER }} \
               --service ${{ env.ECS_SERVICE_FRONTEND }} \
-              --task-definition rca-frontend \
+              --task-definition ${{ env.FE_TASK_ARN }} \
               --force-new-deployment
           else
             aws ecs create-service \
               --cluster ${{ env.ECS_CLUSTER }} \
               --service-name ${{ env.ECS_SERVICE_FRONTEND }} \
-              --task-definition rca-frontend \
+              --task-definition ${{ env.FE_TASK_ARN }} \
               --desired-count 1 \
               --launch-type FARGATE \
               --network-configuration "awsvpcConfiguration={subnets=[${CLEAN_SUBNETS}],securityGroups=[${{ env.APP_SG_ID }}],assignPublicIp=ENABLED}" \

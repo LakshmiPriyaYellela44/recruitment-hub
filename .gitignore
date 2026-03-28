@@ -1,0 +1,133 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+backend/venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Logs & temp outputs
+*.log
+logs/
+diag_out.txt
+*.txt
+backend.log
+backend_async.log
+
+# Build outputs
+node_modules/
+dist/
+build/
+
+# Testing
+.playwright-mcp/
+test-results/
+.pytest_cache/
+
+# Local storage and uploads
+storage/
+uploads/
+
+# Temporary files
+*.tmp
+*.bak
+temp/
+tmp/
+
+# Generated/Report files
+verification_report.json
+PROOF_*.log
+E2E_*.log
+
+# Root level test/diagnostic files (NOT needed in repo)
+test_*.py
+check_*.py
+debug_*.py
+diagnose*.py
+fix_enum.py
+upgrade_subscription.py
+create_*.py
+add_*.py
+reset_*.py
+migrate_*.py
+seed_*.py
+init_*.py
+verify_*.py
+parse_*.py
+list_*.py
+find_*.py
+setup_db*.py
+update_db*.py
+
+# Backend test/diagnostic files (NOT needed in repo)
+backend/test_*.py
+backend/check_*.py
+backend/debug_*.py
+backend/diagnose*.py
+backend/create_*.py
+backend/reset_*.py
+backend/migrate_*.py
+backend/seed_*.py
+backend/init_*.py
+backend/verify_*.py
+backend/parse_*.py
+backend/list_*.py
+backend/find_*.py
+backend/setup_db*.py
+backend/update_db*.py
+
+# Temporary output/data files
+backend/diag_out.txt
+backend/*.txt
+backend/*.log
+backend/all_tables.txt
+backend/correct_tables.txt
+backend/db_schema.txt
+backend/full_schema.txt
+backend/schema_output.txt
+backend/tables_check.txt
+backend/init_output.txt
+backend/verification_report.json
+backend/test.db
+backend/e2e_resume.pdf
+backend/test_resume.pdf
+backend/.pytest_cache/
+backend/logs/
+backend/storage/
+
+# AWS setup/test files (temporary)
+backend/setup_db_user.sql

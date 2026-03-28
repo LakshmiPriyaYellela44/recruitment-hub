@@ -1,0 +1,613 @@
+# System Architecture Diagram
+
+## 🏗️ High-Level System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENT LAYER                             │
+│                                                                  │
+│  ┌──────────────────┐   ┌──────────────────┐                   │
+│  │  Web Browser     │   │  Desktop App     │                   │
+│  │  (React SPA)     │   │  (Electron)      │                   │
+│  └────────┬─────────┘   └────────┬─────────┘                   │
+│           │                      │                             │
+│           └──────────┬───────────┘                             │
+│                      │                                         │
+└──────────────────────┼─────────────────────────────────────────┘
+                       │ HTTP/HTTPS
+                       │ REST API
+                       │ JSON
+┌──────────────────────▼─────────────────────────────────────────┐
+│                    PRESENTATION LAYER                           │
+│                   (React Frontend)                              │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │  React Components                                    │      │
+│  │  ├─ LoginPage, RegisterPage                         │      │
+│  │  ├─ CandidateDashboard, RecruiterDashboard         │      │
+│  │  ├─ Header, PrivateRoute, PublicRoute              │      │
+│  │  └─ Modal Components                               │      │
+│  └──────────────┬───────────────────────────────────────┘      │
+│                 │                                              │
+│  ┌──────────────▼───────────────────────────────────────┐      │
+│  │  API Services Layer                                 │      │
+│  │  ├─ authService.js                                 │      │
+│  │  ├─ candidateService.js                            │      │
+│  │  ├─ recruiterService.js                            │      │
+│  │  ├─ resumeService.js                               │      │
+│  │  ├─ subscriptionService.js                         │      │
+│  │  └─ api.js (Axios setup with JWT interceptor)     │      │
+│  └──────────────┬───────────────────────────────────────┘      │
+│                 │                                              │
+│  ┌──────────────▼───────────────────────────────────────┐      │
+│  │  State Management                                   │      │
+│  │  ├─ AuthContext (user, login, logout)             │      │
+│  │  ├─ React Query (server state)                     │      │
+│  │  └─ Component State (local state)                  │      │
+│  └──────────────┬───────────────────────────────────────┘      │
+└─────────────────┼──────────────────────────────────────────────┘
+                  │ HTTP Requests
+                  │ Authorization: Bearer <JWT>
+                  │
+┌─────────────────▼──────────────────────────────────────────────┐
+│                    API GATEWAY / ROUTER                         │
+│                     (FastAPI Router)                            │
+│                                                                 │
+│  /api/auth/login                                               │
+│  /api/candidates/*                                             │
+│  /api/recruiters/*                                             │
+│  /api/resumes/*                                                │
+│  /api/subscription/*                                           │
+└─────────────────┬──────────────────────────────────────────────┘
+                  │ Route Dispatch
+                  │
+┌─────────────────▼──────────────────────────────────────────────┐
+│                   BUSINESS LOGIC LAYER                          │
+│                (FastAPI Modules/Services)                       │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ Auth Module  │  │Candidate Mod │  │Recruiter Mod│          │
+│  │              │  │              │  │              │          │
+│  │- register()  │  │- getProfile()│  │- search()    │          │
+│  │- login()     │  │- addExp()    │  │- sendEmail() │          │
+│  │- verify_jwt()│  │- addSkill()  │  │- viewProfile│          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │Resume Module │  │Subscription  │  │Resume Worker│          │
+│  │              │  │              │  │              │          │
+│  │- upload()    │  │- upgrade()   │  │- process()   │          │
+│  │- parse()     │  │- verify_tier()│ │- extract()   │          │
+│  │- store()     │  │              │  │              │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────┬──────────────────────────────────────────────┘
+                  │ Repository Pattern
+                  │ SQL Queries
+┌─────────────────▼──────────────────────────────────────────────┐
+│                   DATA ACCESS LAYER                             │
+│              (SQLAlchemy Repositories)                          │
+│                                                                 │
+│  UserRepository         ExperienceRepository                   │
+│  ResumeRepository       EducationRepository                    │
+│  SkillRepository        CandidateSkillRepository               │
+│  AuditLogRepository     EmailRepository                        │
+└─────────────────┬──────────────────────────────────────────────┘
+                  │ SQL Queries
+                  │ ORM Mapping
+┌─────────────────▼──────────────────────────────────────────────┐
+│                   PERSISTENCE LAYER                             │
+│                    (PostgreSQL)                                 │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ users table  │  │resumes table │  │skills table  │          │
+│  │              │  │              │  │              │          │
+│  │- PK: id      │  │- FK: user_id │  │- PK: id      │          │
+│  │- email       │  │- file_name   │  │- name        │          │
+│  │- password    │  │- status      │  │- category    │          │
+│  │- role        │  │- parsed_data │  │              │          │
+│  │- subsc_type  │  │              │  │              │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │experiences   │  │educations    │  │audit_logs    │          │
+│  │table         │  │table         │  │table         │          │
+│  │              │  │              │  │              │          │
+│  │- FK: user_id │  │- FK: user_id │  │- resource_id │          │
+│  │- job_title   │  │- degree      │  │- action      │          │
+│  │- company     │  │- institution │  │- user_id     │          │
+│  │- years       │  │- field       │  │- timestamp   │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                 │
+│  + candidate_skills (M2M join table)                            │
+│  + emails_sent (Email tracking)                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📤 Resume Upload Event Flow
+
+```
+User Action: Upload Resume File
+         │
+         ▼
+┌─────────────────────────────────┐
+│  Frontend: ResumeTab Component  │
+│  - File input validation        │
+│  - FormData creation            │
+│  - POST /api/resumes/upload     │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Backend: Resume Router         │
+│  - Route: POST /resumes/upload  │
+│  - File validation              │
+│  - Auth check                   │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Resume Service                 │
+│  - Generate unique filename     │
+│  - Validate file type           │
+│  - Call S3 mock upload          │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  S3 Mock Client                 │
+│  - Create storage directory     │
+│  - Write file to disk           │
+│  - Return file path             │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Resume Repository              │
+│  - Create DB record             │
+│  - Set status: UPLOADED         │
+│  - Store file path              │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  SNS Mock Client                │
+│  - Get resume-upload topic      │
+│  - Publish event message        │
+│  - Notify all subscribers       │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Background Worker              │
+│  - Receive SNS event            │
+│  - Download file from S3        │
+│  - Parse with PyPDF2/python-docx│
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Resume Parser                  │
+│  - Extract text                 │
+│  - Parse name                   │
+│  - Extract email & phone        │
+│  - Identify skills              │
+│  - Extract experiences          │
+│  - Extract educations           │
+│  - Generate summary             │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  Resume Repository              │
+│  - Update DB record             │
+│  - Set status: PARSED           │
+│  - Store parsed_data JSON       │
+│  - Audit log entry              │
+└────────────┬────────────────────┘
+             │
+             ▼
+Frontend Updates: Resume now searchable & indexed
+```
+
+---
+
+## 🔍 Recruiter Search Flow
+
+```
+User Action: Enter Search Filters
+         │
+         ▼
+┌────────────────────────────────────────┐
+│  Frontend: RecruiterDashboard          │
+│  - Skills input                        │
+│  - Experience range slider             │
+│  - Keyword search box                  │
+│  - Click "Search"                      │
+└────────────┬─────────────────────────┘
+             │ GET /api/recruiters/search?skills=...
+             │
+             ▼
+┌────────────────────────────────────────┐
+│  Backend: Recruiter Router             │
+│  - Parse query parameters              │
+│  - Auth check (must be RECRUITER)      │
+│  - Set pagination (limit, offset)      │
+└────────────┬─────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────┐
+│  Recruiter Service                     │
+│  - Convert skill names → IDs           │
+│  - Log audit: "search_executed"        │
+│  - Call repository search              │
+└────────────┬─────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────┐
+│  Recruiter Repository                  │
+│  - Complex SQL query:                  │
+│    SELECT DISTINCT users.*             │
+│    FROM users                          │
+│    LEFT JOIN candidate_skills          │
+│    LEFT JOIN experiences               │
+│    LEFT JOIN educations                │
+│    WHERE user.role='CANDIDATE'         │
+│      AND skills.id IN (...)            │
+│      AND experiences.years >= min      │
+│      AND experiences.years <= max      │
+│      AND (users.first_name LIKE ...    │
+│           OR users.email LIKE ...)     │
+│    LIMIT ? OFFSET ?                    │
+└────────────┬─────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────┐
+│  PostgreSQL Database                   │
+│  - Use indexed columns                 │
+│  - Join tables efficiently             │
+│  - Apply filters                       │
+│  - Count total results                 │
+│  - Return paginated results            │
+└────────────┬─────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────┐
+│  Frontend: Display Results              │
+│  - Candidate cards                     │
+│  - Skills badges                       │
+│  - "View Profile" button (PRO only)    │
+│  - "Send Email" button (PRO only)      │
+│  - Pagination controls                 │
+└────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Authentication & Authorization Flow
+
+```
+Client Action: User enters email/password
+         │
+         ▼
+┌──────────────────────────────────┐
+│  Frontend: LoginPage             │
+│  - Collect email & password      │
+│  - POST /api/auth/login          │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Auth Router                     │
+│  - Validate request format       │
+│  - Call auth service             │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Auth Service                    │
+│  - Get user by email             │
+│  - Verify password with bcrypt   │
+│  - Create JWT token              │
+│  - Log audit event               │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Response with JWT               │
+│  {                               │
+│    "access_token": "eyJ...",    │
+│    "token_type": "bearer",       │
+│    "user": {...}                 │
+│  }                               │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Frontend: Store Token           │
+│  - localStorage.setItem("token") │
+│  - Update AuthContext            │
+│  - Redirect to /dashboard        │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Protected Route Access          │
+│  - GET /api/candidates/me        │
+│  - Include: Authorization header │
+│  - Header value: "Bearer <token>"│
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Axios Interceptor               │
+│  - Extract token from storage    │
+│  - Add to Authorization header   │
+│  - Forward request               │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Backend: Verify Token           │
+│  - Extract token from header     │
+│  - Decode JWT                    │
+│  - Check expiration              │
+│  - Extract user_id               │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Check Authorization             │
+│                                  │
+│  If RECRUITER accessing          │
+│  /recruiters/send-email:         │
+│  - Verify role = RECRUITER       │
+│  - Verify subscription = PRO     │
+│  - Return 403 if not authorized  │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│  Process Request                 │
+│  - Execute business logic        │
+│  - Log audit trail               │
+│  - Return response               │
+└──────────────────────────────────┘
+```
+
+---
+
+## 🗄️ Database Relationships
+
+```
+┌─────────────────┐
+│     users       │  (Single users table, role-based)
+├─────────────────┤
+│ id (PK)         │
+│ email (UNIQUE)  │
+│ password_hash   │
+│ first_name      │
+│ last_name       │
+│ role            │◄────────────────────┐ CANDIDATE or RECRUITER
+│ subscription    │◄───────────────────┐│ BASIC or PRO
+│ created_at      │                    ││
+│ updated_at      │                    ││
+│ created_by      │                    ││
+│ updated_by      │                    ││
+└────┬────────────┘                    ││
+     │                                 ││
+     │ 1:N     ┌──────────────────┐    ││
+     ├─────────┤ resumes          │    ││
+     │         ├──────────────────┤    ││
+     │         │ id               │    ││
+     │         │ user_id (FK) ────┼────┘│
+     │         │ file_name        │     │
+     │         │ file_type        │     │
+     │         │ status (enum)    │     │
+     │         │ parsed_data (JSON)    │
+     │         │ created_at       │     │
+     │         └──────────────────┘     │
+     │                                  │
+     │ 1:N     ┌──────────────────┐     │
+     ├─────────┤ experiences      │     │
+     │         ├──────────────────┤     │
+     │         │ id               │     │
+     │         │ user_id (FK) ────┼─────┘
+     │         │ job_title        │
+     │         │ company          │
+     │         │ years            │
+     │         │ description      │
+     │         │ start_date       │
+     │         │ end_date         │
+     │         │ is_current       │
+     │         └──────────────────┘
+     │
+     │ 1:N     ┌──────────────────┐
+     ├─────────┤ educations       │
+     │         ├──────────────────┤
+     │         │ id               │
+     │         │ user_id (FK) ────┼─────────┐
+     │         │ institution      │         │
+     │         │ degree           │         │
+     │         │ field            │         │
+     │         │ start_date       │         │
+     │         │ end_date         │         │
+     │         └──────────────────┘         │
+     │                                     │
+     │ N:N     ┌──────────────────┐        │
+     └─────────┤ candidate_skills │        │
+             ├──────────────────┤        │
+             │ id               │        │
+             │ candidate_id (FK)├────────┘
+             │ skill_id (FK) ──┐│
+             │ created_at       ││
+             │ updated_at       ││
+             └──────────────────┘│
+                                │
+              ┌─────────────────┐│
+              │ skills          ││
+              ├─────────────────┤│
+              │ id (PK) ◄────────┘
+              │ name (UNIQUE)
+              │ category
+              │ created_at
+              └─────────────────┘
+
+Additional Tables:
+─────────────────────────────────
+┌──────────────────────┐
+│ emails_sent          │
+├──────────────────────┤
+│ id                   │
+│ from_user_id (FK) ──→ users.id
+│ to_email             │
+│ subject              │
+│ body                 │
+│ sent_at              │
+└──────────────────────┘
+
+┌──────────────────────┐
+│ audit_logs           │
+├──────────────────────┤
+│ id                   │
+│ action               │
+│ resource_type        │
+│ resource_id          │
+│ user_id (FK) ───────→ users.id
+│ changes (JSONB)      │
+│ created_at           │
+└──────────────────────┘
+```
+
+---
+
+## 🔄 API Request/Response Flow
+
+```
+Frontend                     Backend
+─────────────────────────────────────────────────────────
+
+        GET /api/auth/me
+        Authorization: Bearer <token>
+        ─────────────────────────────────→
+                                   ↓
+                        Verify token
+                        Extract user_id
+                        Get user from DB
+                        ↓
+        ←─────────────────────────────────
+        200 OK
+        {
+          "id": "uuid",
+          "email": "user@example.com",
+          "role": "CANDIDATE",
+          "subscription_type": "PRO"
+        }
+
+        POST /api/candidates/experience
+        Authorization: Bearer <token>
+        Content-Type: application/json
+        
+        {
+          "job_title": "Engineer",
+          "company": "Acme",
+          "years": 5
+        }
+        ─────────────────────────────────→
+                                   ↓
+                        Verify auth
+                        Validate input
+                        Create record
+                        Audit log
+                        ↓
+        ←─────────────────────────────────
+        201 Created
+        {
+          "id": "new-uuid",
+          "user_id": "user-uuid",
+          "job_title": "Engineer",
+          "company": "Acme",
+          "years": 5,
+          "created_at": "2024-01-15T10:30:00"
+        }
+
+Error Case:
+─────────────────────────────────────────────────────────
+
+        POST /api/auth/login
+        {"email": "bad@example.com", "password": "wrong"}
+        ─────────────────────────────────→
+                                   ↓
+                        User not found
+                        ↓
+        ←─────────────────────────────────
+        401 Unauthorized
+        {
+          "error": {
+            "code": "AUTHENTICATION_ERROR",
+            "message": "Invalid email or password"
+          }
+        }
+```
+
+---
+
+## 📊 Component Interaction Map
+
+```
+                    ┌──────────────┐
+                    │ LoginPage    │
+                    └──────┬───────┘
+                           │
+                    authService.login()
+                           │
+                           ▼
+                    ┌──────────────┐
+                    │ AuthContext  │
+                    │ (stores token│
+                    │  in storage) │
+                    └──────┬───────┘
+                           │
+                    ┌──────┴──────────────────┐
+                    │                         │
+                    ▼                         ▼
+            ┌───────────────┐        ┌───────────────┐
+            │ Header        │        │  Dashboard    │
+            │ (shows user)  │        │ (role-based)  │
+            └───────────────┘        └───┬───────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+                    ▼                   ▼                   ▼
+            ┌──────────────┐    ┌──────────────┐   ┌──────────────┐
+            │ Candidate    │    │ Recruiter    │   │ Loading      │
+            │ Dashboard    │    │ Dashboard    │   │ Spinner      │
+            └──────┬───────┘    └──────┬───────┘   └──────────────┘
+                   │                   │
+                   ▼                   ▼
+            ┌──────────────┐    ┌──────────────┐
+            │ Resume Tab   │    │ Search Form  │
+            │ Upload file  │    │ Filters      │
+            └──────┬───────┘    └──────┬───────┘
+                   │                   │
+    resumeService  │                   │  recruiterService
+    .uploadResume()│                   │  .searchCandidates()
+                   │                   │
+                   ▼                   ▼
+            ┌──────────────┐    ┌──────────────┐
+            │ Resume List  │    │ Candidate    │
+            │ Parsed data  │    │ Cards Grid   │
+            └──────────────┘    └──────┬───────┘
+                                       │
+                                       ▼
+                                ┌──────────────┐
+                                │ Modals       │
+                                │ Profile, Email
+                                └──────────────┘
+```
+
+---
+
+**This diagram shows the complete flow of data through the system from frontend to database and back.** 🎨
+

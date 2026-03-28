@@ -12,7 +12,7 @@ RUN npm ci
 COPY . .
 
 # Install additional dependencies
-RUN npm install -D tailwindcss @tailwindcss/postcss postcss autoprefixer
+RUN npm install -D tailwindcss @tailwindcss/vite postcss autoprefixer
 
 # Build application
 RUN npm run build

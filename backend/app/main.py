@@ -31,9 +31,9 @@ worker_task = None
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     from app.core.database import init_db, close_db
-    
+
     global worker_task
-    
+
     # Startup
     logger.info("Starting Recruitment Platform...")
     try:
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"✗ Failed to initialize database: {e}")
         raise
-    
+
     # Initialize event infrastructure
     try:
         EventConfig.initialize()
@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"✗ Failed to initialize event infrastructure: {e}")
         raise
-    
+
     # Start background worker for resume processing
     try:
         sqs_client = EventConfig.get_sqs_client()
@@ -59,12 +59,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"✗ Failed to start resume worker: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Recruitment Platform...")
-    
+
     # Stop the worker task
     if worker_task and not worker_task.done():
         try:
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
             logger.info("✓ Resume worker stopped")
         except Exception as e:
             logger.error(f"✗ Error stopping resume worker: {e}")
-    
+
     try:
         await close_db()
         logger.info("✓ Recruitment Platform shutdown complete")
@@ -113,7 +113,7 @@ app.include_router(subscription_router, prefix="/api")
 app.include_router(template_router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "app": settings.APP_NAME}
@@ -122,3 +122,4 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+ 

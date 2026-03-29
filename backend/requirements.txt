@@ -17,3 +17,9 @@ python-dotenv
 asyncpg
 greenlet
 email-validator 
+
+aioboto3
+httpx
+requests
+pytest
+ 

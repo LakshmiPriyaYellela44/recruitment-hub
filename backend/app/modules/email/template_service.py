@@ -113,13 +113,38 @@ class EmailTemplateService:
         if not template:
             raise NotFoundException("EmailTemplate", str(template_id))
         
+        # Get parsed resume email if available (prefer parsed resume email over provided email)
+        from app.core.models import Resume
+        resume_result = await self.db.execute(
+            select(Resume)
+            .filter(Resume.user_id == candidate_id)
+            .filter(Resume.status == "PARSED")
+            .order_by(Resume.created_at.desc())
+            .limit(1)
+        )
+        resume = resume_result.scalars().first()
+        
+        # Extract email from parsed resume data if available
+        parsed_email = None
+        if resume and resume.parsed_data:
+            parsed_email = resume.parsed_data.get("email") if isinstance(resume.parsed_data, dict) else None
+        
+        # Use parsed email if available, otherwise fall back to provided candidate_email
+        email_to_send = parsed_email if parsed_email else candidate_email
+        
+        if not email_to_send:
+            raise ValidationException(
+                f"No email found for candidate. Please provide a valid email address.",
+                {"candidate_id": str(candidate_id)}
+            )
+        
         # Render template
         subject, body = self.render_template(template, dynamic_data)
         
         # Send via SES
         try:
             email_id = await self.ses_client.send_email(
-                to_addresses=[candidate_email],
+                to_addresses=[email_to_send],
                 subject=subject,
                 body=body
             )
@@ -131,21 +156,21 @@ class EmailTemplateService:
                 logger.warning(
                     f"Email not sent - recipient address not verified in AWS SES",
                     extra={
-                        "candidate_email": candidate_email,
+                        "candidate_email": email_to_send,
                         "candidate_id": str(candidate_id),
                         "recruiter_id": str(recruiter_id),
                     }
                 )
                 raise ValidationException(
-                    f"Cannot send email to {candidate_email} - this email address is not verified in AWS SES. "
+                    f"Cannot send email to {email_to_send} - this email address is not verified in AWS SES. "
                     f"Please verify this email address in the AWS SES console before sending emails.",
-                    {"unverified_email": candidate_email, "aws_console": "https://console.aws.amazon.com/sesu/"}
+                    {"unverified_email": email_to_send, "aws_console": "https://console.aws.amazon.com/sesu/"}
                 )
             else:
                 logger.error(
                     f"Failed to send email via SES",
                     extra={
-                        "candidate_email": candidate_email,
+                        "candidate_email": email_to_send,
                         "candidate_id": str(candidate_id),
                         "error": error_msg
                     }
@@ -158,7 +183,7 @@ class EmailTemplateService:
         # Log email
         email_sent = EmailSent(
             from_user_id=recruiter_id,
-            to_email=candidate_email,
+            to_email=email_to_send,
             to_candidate_id=candidate_id,
             template_id=template_id,
             subject=subject,
@@ -184,6 +209,7 @@ class EmailTemplateService:
         return {
             "message": "Email sent successfully",
             "email_id": email_id,
-            "recipient": candidate_email,
+            "message_id": email_id,  # For backward compatibility
+            "recipient": email_to_send,
             "template_name": template.name
         }

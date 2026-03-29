@@ -6,9 +6,9 @@ Uses LLM to parse natural language into structured requirements
 
 import json
 import logging
+import asyncio
 from typing import Dict, List, Optional
-from openai import OpenAI
-import os
+from app.modules.ai.config import AIConfig, FeatureFlags
 
 logger = logging.getLogger(__name__)
 
@@ -22,42 +22,102 @@ class QueryParser:
     """
     Parse recruiter queries like:
     "Find senior Python developers with 5+ years AWS experience"
-    
+
     Extract:
     - Required skills
     - Minimum experience
     - Seniority level
     - Nice-to-have skills
     """
-    
+
     def __init__(self):
-        """Initialize query parser"""
-        self.enabled = bool(os.getenv("OPENAI_API_KEY"))
-        if self.enabled:
-            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
+        """Initialize query parser with available LLM"""
+        self.enabled = FeatureFlags.resume_parser_available() # Reusing same check
+
+        if not self.enabled:
+            logger.warning("Query parser disabled - No API keys configured")
+            self.client = None
+            return
+
+        try:
+            # Import client inside to avoid ModuleNotFoundError at top level
+            if AIConfig.USE_GOOGLE_GEMINI and AIConfig.GOOGLE_API_KEY:
+                import google.generativeai as genai
+                genai.configure(api_key=AIConfig.GOOGLE_API_KEY)
+                self.client = genai
+                self.use_google = True
+                logger.info("✅ Query parser using Google Gemini")
+            elif AIConfig.OPENAI_API_KEY:
+                from openai import OpenAI
+                self.client = OpenAI(api_key=AIConfig.OPENAI_API_KEY)
+                self.use_google = False
+                logger.info("✅ Query parser using OpenAI")
+            else:
+                self.enabled = False
+                self.client = None
+        except Exception as e:
+            logger.error(f"Failed to initialize query parser: {e}")
+            self.enabled = False
+            self.client = None
+
+    async def _call_gemini(self, prompt: str) -> str:
+        """Call Google Gemini API"""
+        try:
+            model_name = AIConfig.PARSER_MODEL
+            model = self.client.GenerativeModel(model_name)
+            response = await asyncio.to_thread(
+                model.generate_content,
+                prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini error in query parser: {e}")
+            raise
+
+    async def _call_openai(self, prompt: str) -> str:
+        """Call OpenAI API"""
+        try:
+            response = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                model=AIConfig.PARSER_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=300
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"OpenAI error in query parser: {e}")
+            raise
+
     def parse_query(self, query: str) -> Dict[str, any]:
         """
-        Parse recruiter query
-        
-        Input: "Find senior Python developers with 5+ years AWS, Docker experience"
-        
-        Returns:
-        {
-            "required_skills": ["Python", "AWS", "Docker"],
-            "nice_to_have_skills": [],
-            "min_experience_years": 5,
-            "seniority_level": "Senior",
-            "job_title": "Python Developer",
-            "search_text": "...",
-            "confidence": 0.95
-        }
+        Parse recruiter query (Synchronous wrapper for legacy compatibility)
         """
-        
-        if not self.enabled:
-            # Fallback: simple parsing
+        try:
+            # Try to get the running loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If a loop is already running, we can't use asyncio.run()
+                # Instead, we should ideally await parse_query_async in the caller.
+                # But to maintain current sync signature, we use a thread-safe call if possible
+                # or just run it and hope for the best in this specific sync context.
+                # However, chat_router.py calls this from an async function but doesn't await it.
+                return asyncio.run_coroutine_threadsafe(self.parse_query_async(query), loop).result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                return asyncio.run(self.parse_query_async(query))
+        except Exception as e:
+            logger.error(f"Sync parse_query failed: {e}")
             return self._simple_parse(query)
-        
+
+    async def parse_query_async(self, query: str) -> Dict[str, any]:
+        """
+        Parse recruiter query (Async version)
+        """
+
+        if not self.enabled:
+            return self._simple_parse(query)
+
         try:
             prompt = f"""Parse this recruiter job query into structured requirements.
 
@@ -83,44 +143,36 @@ Rules:
 - If skills unclear, use keywords field
 - Return null for fields not mentioned
 - confidence: your confidence in parsing (0-1)"""
-            
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,  # Deterministic
-                max_tokens=300
-            )
-            
-            response_text = response.choices[0].message.content
-            
+
+            if self.use_google:
+                response_text = await self._call_gemini(prompt)
+            else:
+                response_text = await self._call_openai(prompt)
+
             # Clean markdown
             if "```" in response_text:
                 response_text = response_text.split("```")[1]
                 if "json" in response_text:
                     response_text = response_text.split("json", 1)[1]
                 response_text = response_text.rsplit("```", 1)[0]
-            
+
             result = json.loads(response_text)
             result["confidence"] = 0.95
             result["parse_method"] = "llm"
-            
-            logger.info(f"Parsed query: {result['seniority_level']} {result['job_title']}")
+
+            logger.info(f"Parsed query: {result.get('seniority_level')} {result.get('job_title')}")
             return result
-        
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}")
-            return self._simple_parse(query)
-        
+
         except Exception as e:
-            logger.error(f"Error parsing query: {e}")
+            logger.error(f"Error in parse_query_async: {e}")
             return self._simple_parse(query)
-    
+
     @staticmethod
     def _simple_parse(query: str) -> Dict:
         """Fallback simple query parsing"""
-        
+
         query_lower = query.lower()
-        
+
         # Common skill keywords
         skill_keywords = {
             "python": ["python", "py"],
@@ -136,7 +188,7 @@ Rules:
             "django": ["django"],
             "spring": ["spring"],
         }
-        
+
         # Extract skills
         skills = []
         for skill, keywords in skill_keywords.items():
@@ -144,7 +196,7 @@ Rules:
                 if kw in query_lower:
                     skills.append(skill)
                     break
-        
+
         # Extract experience
         exp_years = 0
         for i in range(20, 0, -1):
@@ -152,7 +204,7 @@ Rules:
             if any(p in query_lower for p in patterns):
                 exp_years = i
                 break
-        
+
         # Extract seniority
         seniority = None
         if any(w in query_lower for w in ["senior", "lead", "principal", "architect"]):
@@ -161,7 +213,7 @@ Rules:
             seniority = "Junior"
         elif any(w in query_lower for w in ["mid", "intermediate"]):
             seniority = "Mid"
-        
+
         return {
             "required_skills": skills,
             "nice_to_have_skills": [],
@@ -169,7 +221,7 @@ Rules:
             "seniority_level": seniority,
             "job_title": None,
             "search_text": query,
-            "confidence": 0.6,  # Lower confidence for simple parsing
+            "confidence": 0.6,
             "parse_method": "simple"
         }
 
@@ -183,3 +235,4 @@ def get_query_parser() -> QueryParser:
     if _parser_instance is None:
         _parser_instance = QueryParser()
     return _parser_instance
+ 

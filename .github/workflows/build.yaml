@@ -12,6 +12,7 @@ env:
   ECS_CLUSTER: rca-prod-cluster
   ECS_SERVICE_FRONTEND: frontend-services
   ECS_SERVICE_BACKEND: backend-services
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   deploy:
@@ -39,7 +40,7 @@ jobs:
       - name: Build & Push Backend
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND_REPO }}:latest
+          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }}
           docker build -t backend ./backend
           docker tag backend:latest $IMAGE
           docker push $IMAGE
@@ -47,7 +48,7 @@ jobs:
       - name: Build & Push Frontend
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_FRONTEND_REPO }}:latest
+          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
           docker build -t frontend ./frontend
           docker tag frontend:latest $IMAGE
           docker push $IMAGE
@@ -59,7 +60,7 @@ jobs:
 
           SECRET_ARN="arn:aws:secretsmanager:$REGION:$ACCOUNT_ID:secret:my-backend-secrets"
 
-          IMAGE=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${{ env.ECR_BACKEND_REPO }}:latest
+          IMAGE=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${{ env.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }}
 
           cat > be-task.json <<EOF
           {
@@ -134,7 +135,7 @@ jobs:
       - name: Register Frontend Task Definition
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_FRONTEND_REPO }}:latest
+          IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
 
           cat > fe-task.json <<EOF
           {

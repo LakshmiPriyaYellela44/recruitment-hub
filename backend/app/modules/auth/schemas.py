@@ -64,6 +64,7 @@ class ChangePasswordRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+    new_password: str = Field(..., min_length=6, description="New password (minimum 6 characters)")
 
 
 class ResetPasswordRequest(BaseModel):

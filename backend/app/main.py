@@ -3,6 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import asyncio
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file (in backend directory)
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(env_path)
+print(f"Loading .env from: {env_path}")
+print(f"API Key loaded: {bool(os.getenv('GOOGLE_API_KEY'))}")
 
 from app.core.config import settings
 from app.core.database import init_db
@@ -16,6 +24,8 @@ from app.modules.recruiter.websocket_router import router as recruiter_ws_router
 from app.modules.resume.router import router as resume_router
 from app.modules.subscription.router import router as subscription_router
 from app.modules.email.template_router import router as template_router
+from app.modules.ai.router import router as ai_router
+from app.modules.ai.chat_router import router as chat_router
 from app.events.config import EventConfig
 from app.workers.resume_worker import start_resume_worker
 
@@ -111,6 +121,8 @@ app.include_router(recruiter_ws_router, prefix="/api")
 app.include_router(resume_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")
 app.include_router(template_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 
 
 @app.get("/api/health")

@@ -4,8 +4,10 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { PrivateRoute, PublicRoute } from './components/PrivateRoute';
 import { Header } from './components/Header';
+import { AIChatBox } from './components/AIChatBox';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { Dashboard } from './pages/Dashboard';
 import { MyProfilePage } from './pages/MyProfilePage';
 import CandidateProfilePage from './pages/CandidateProfilePage';
@@ -19,6 +21,7 @@ function App() {
       <AuthProvider>
         <Router>
           <Header />
+          <AIChatBox />
           <Routes>
             <Route
               path="/login"
@@ -33,6 +36,14 @@ function App() {
               element={
                 <PublicRoute>
                   <RegisterPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicRoute>
+                  <ForgotPasswordPage />
                 </PublicRoute>
               }
             />

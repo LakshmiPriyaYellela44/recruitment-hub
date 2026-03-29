@@ -4,6 +4,9 @@ from sqlalchemy.orm import selectinload
 from app.core.models import User, UserRole, Skill, CandidateSkill, Experience, Education, EmailSent, Resume
 from typing import List, Optional, Tuple, Dict, Any
 from uuid import UUID
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RecruiterRepository:
@@ -164,14 +167,34 @@ class RecruiterRepository:
         # Manually convert to dict
         candidates = []
         for user in users:
-            candidate_dict = {
-                "id": str(user.id),
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "skills": [{"id": str(s.id), "name": s.name, "category": s.category, "created_at": s.created_at} for s in user.skills]
-            }
-            candidates.append(candidate_dict)
+            try:
+                # Safely serialize skills data
+                skills_list = []
+                if user.skills:
+                    for s in user.skills:
+                        skills_list.append({
+                            "id": str(s.id) if hasattr(s, 'id') else "",
+                            "name": s.name if hasattr(s, 'name') else ""
+                        })
+                
+                candidate_dict = {
+                    "id": str(user.id),
+                    "email": user.email or "",
+                    "first_name": user.first_name or "",
+                    "last_name": user.last_name or "",
+                    "skills": skills_list
+                }
+                candidates.append(candidate_dict)
+            except Exception as e:
+                logger.error(f"Error serializing candidate {user.id}: {e}")
+                # Add basic candidate info even if there's an error
+                candidates.append({
+                    "id": str(user.id),
+                    "email": user.email or "",
+                    "first_name": user.first_name or "",
+                    "last_name": user.last_name or "",
+                    "skills": []
+                })
         
         return candidates, total_count
     

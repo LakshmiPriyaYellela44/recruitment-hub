@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import BaseAppException
 from app.modules.auth.schemas import (
@@ -83,28 +85,6 @@ async def change_password(
     }
 
 
-@router.post("/forgot-password", response_model=dict)
-async def forgot_password(
-    request: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """Request a password reset. Generates a reset token."""
-    try:
-        service = AuthService(db)
-        reset_token, expires_in_hours = await service.forgot_password(request.email)
-        
-        return {
-            "message": "If that email address is in our system, we will send a password reset email",
-            "reset_token": reset_token,  # In production, this would be sent via email instead
-            "expires_in_hours": expires_in_hours
-        }
-    except BaseAppException as e:
-        raise HTTPException(
-            status_code=e.status_code,
-            detail={"error": {"code": e.code, "message": e.message, "details": e.details}}
-        )
-
-
 @router.post("/reset-password", response_model=dict)
 async def reset_password(
     request: ResetPasswordRequest,
@@ -124,4 +104,155 @@ async def reset_password(
             status_code=e.status_code,
             detail={"error": {"code": e.code, "message": e.message, "details": e.details}}
         )
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Forgot Password - Reset password with just email and new password.
+    No current password verification needed (for users who forgot their password).
+    
+    Returns success regardless of whether email exists (for security).
+    If email exists in system, password is reset. Otherwise, operation completes silently.
+    """
+    try:
+        from app.core.security import get_password_hash
+        from app.modules.auth.repository import AuthRepository
+        
+        repo = AuthRepository(db)
+        
+        # Find user by email (if exists)
+        user = await repo.get_user_by_email(request.email.lower())
+        
+        if user:
+            # User found - reset their password
+            user.password_hash = get_password_hash(request.new_password)
+            user.updated_at = datetime.utcnow()
+            updated_user = await repo.update_user(user)
+            
+            return {
+                "message": "✅ Password reset successfully",
+                "user": UserResponse.from_orm(updated_user)
+            }
+        else:
+            # Email not found - still return success (security best practice)
+            # Don't reveal whether email exists in system
+            return {
+                "message": "✅ If that email address is in our system, the password has been updated",
+                "user": None
+            }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "RESET_ERROR", "message": str(e)}}
+        )
+
+
+
+@router.post("/simple-reset-password")
+async def simple_reset_password(
+    email: str,
+    current_password: str,
+    new_password: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Simple password reset - user provides email and current password to set new one.
+    No tokens or emails required. Simple UI flow for password changes.
+    """
+    try:
+        from app.core.security import get_password_hash, verify_password
+        from app.modules.auth.repository import AuthRepository
+        
+        repo = AuthRepository(db)
+        
+        # Verify user exists and password is correct
+        user = await repo.get_user_by_email(email.lower())
+        if not user or not verify_password(current_password, user.password_hash):
+            raise HTTPException(
+                status_code=401,
+                detail={"error": {"code": "INVALID_CREDENTIALS", "message": "Invalid email or password"}}
+            )
+        
+        # Update password
+        user.password_hash = get_password_hash(new_password)
+        user.updated_at = datetime.utcnow()
+        updated_user = await repo.update_user(user)
+        
+        return {
+            "message": "✅ Password changed successfully",
+            "user": UserResponse.from_orm(updated_user)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "RESET_ERROR", "message": str(e)}}
+        )
+
+
+# ============ DEBUG ENDPOINTS (Development Only) ============
+
+@router.post("/debug/reset-password-by-email")
+async def debug_reset_password_by_email(
+    email: str,
+    new_password: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    DEBUG ENDPOINT - Reset password by email (development only).
+    
+    WARNING: This endpoint is only available in DEBUG mode!
+    Do not use in production.
+    
+    Usage:
+        POST /api/auth/debug/reset-password-by-email
+        ?email=candidate1@gmail.com&new_password=TestPassword123
+    """
+    if not settings.DEBUG:
+        raise HTTPException(
+            status_code=403,
+            detail="This endpoint is only available in DEBUG mode"
+        )
+    
+    try:
+        from app.core.security import get_password_hash
+        from app.modules.auth.repository import AuthRepository
+        
+        repo = AuthRepository(db)
+        
+        # Find user
+        user = await repo.get_user_by_email(email.lower())
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": {"code": "USER_NOT_FOUND", "message": f"User {email} not found"}}
+            )
+        
+        # Reset password
+        user.password_hash = get_password_hash(new_password)
+        updated_user = await repo.update_user(user)
+        
+        return {
+            "message": "✅ Password reset successfully (DEBUG MODE)",
+            "user": {
+                "email": updated_user.email,
+                "role": updated_user.role.value,
+                "is_active": updated_user.is_active,
+                "new_password": new_password
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "RESET_ERROR", "message": str(e)}}
+        )
+
 

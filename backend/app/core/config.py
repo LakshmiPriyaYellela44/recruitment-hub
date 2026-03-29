@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     # Resume Processing
     RESUME_SYNC_PARSING: bool = True  # Parse resumes synchronously instead of async (for development)
 
+    # AI Configuration
+    GOOGLE_API_KEY: str = ""
+    USE_GOOGLE_GEMINI: bool = False
+    USE_CHROMA: bool = False
+
     # CORS
     CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
 

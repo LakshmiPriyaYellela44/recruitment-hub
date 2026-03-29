@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 from app.core.config import settings
 
 # Use PBKDF2 for password hashing
@@ -11,6 +13,8 @@ pwd_context = CryptContext(
     deprecated="auto",
     pbkdf2_sha256__rounds=100000  # NIST recommends min 100,000 rounds
 )
+
+security = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -47,3 +51,21 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+async def get_current_user(credentials: HTTPBearer = Depends(security)) -> dict:
+    """
+    Get the current authenticated user from the JWT token.
+    Returns the decoded token payload containing user information.
+    """
+    token = credentials.credentials
+    payload = verify_token(token)
+    
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return payload

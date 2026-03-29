@@ -57,6 +57,16 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const refetchUser = async () => {
+    try {
+      const response = await authService.getCurrentUser();
+      setUser(response.data);
+      return response.data;
+    } catch (err) {
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ user, setUser, login, register, logout, loading, error, refetchUser }}>
       {children}
@@ -72,11 +82,5 @@ export const useAuth = () => {
   return context;
 };
 
-export const refetchUser = async () => {
-  try {
-    const response = await authService.getCurrentUser();
-    return response.data;
-  } catch (err) {
-    return null;
-  }
-};
+// Export AuthContext for direct use
+export { AuthContext };

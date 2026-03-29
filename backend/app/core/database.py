@@ -12,10 +12,15 @@ logger = logging.getLogger(__name__)
 connect_args = {}
 if settings.async_database_url and "postgresql" in settings.async_database_url:
     # PostgreSQL-specific settings
+    # For RDS in production: require SSL for security
+    # For local dev: disable SSL for easier testing
+    ssl_mode = "require" if settings.APP_ENV == "production" else "disable"
+    
     connect_args = {
         "server_settings": {"application_name": settings.APP_NAME},
-        "ssl": "require"  # RDS often needs SSL, "require" is safer than "prefer" here
+        "ssl": ssl_mode
     }
+    logger.info(f"PostgreSQL SSL mode: {ssl_mode} (environment: {settings.APP_ENV})")
 # SQLite doesn't need additional connect_args
 
 engine: AsyncEngine = create_async_engine(

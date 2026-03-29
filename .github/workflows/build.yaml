@@ -100,6 +100,8 @@ jobs:
             "taskRoleArn": "arn:aws:iam::$ACCOUNT_ID:role/ecsTaskExecutionRole"
           }
           EOF
+          BE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://be-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "BE_TASK_ARN=$BE_TASK_ARN" >> $GITHUB_ENV
 
       - name: Deploy or Create Backend Service
         run: |
@@ -166,7 +168,6 @@ jobs:
             "taskRoleArn": "arn:aws:iam::$ACCOUNT_ID:role/ecsTaskExecutionRole"
           }
           EOF
-
           FE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://fe-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "FE_TASK_ARN=$FE_TASK_ARN" >> $GITHUB_ENV
 

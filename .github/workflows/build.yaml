@@ -86,9 +86,8 @@ jobs:
                   "logDriver": "awslogs",
                   "options": {
                     "awslogs-group": "/ecs/${{ env.ECS_SERVICE_BACKEND }}",
-                    "awslogs-region": "$REGION",
-                    "awslogs-stream-prefix": "ecs",
-                    "awslogs-create-group": "true"
+                    "awslogs-region": "${{ env.AWS_REGION }}",
+                    "awslogs-stream-prefix": "ecs"
                   }
                 }
               }
@@ -100,6 +99,10 @@ jobs:
             "taskRoleArn": "arn:aws:iam::$ACCOUNT_ID:role/ecsTaskExecutionRole"
           }
           EOF
+          )
+          echo "$TASK_DEF" > be-task.json
+          BE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://be-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "BE_TASK_ARN=$BE_TASK_ARN" >> $GITHUB_ENV
 
       - name: Deploy or Create Backend Service
         run: |
@@ -165,7 +168,8 @@ jobs:
             "taskRoleArn": "arn:aws:iam::$ACCOUNT_ID:role/ecsTaskExecutionRole"
           }
           EOF
-
+          )
+          echo "$TASK_DEF" > fe-task.json
           FE_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://fe-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "FE_TASK_ARN=$FE_TASK_ARN" >> $GITHUB_ENV
 
@@ -194,4 +198,5 @@ jobs:
               --desired-count 1 \
               --launch-type FARGATE \
               --network-configuration "awsvpcConfiguration={subnets=[${CLEAN_SUBNETS}],securityGroups=[${{ env.APP_SG_ID }}],assignPublicIp=ENABLED}" \
-              --load-balancers "targetGroupArn=${{ env.FE_TG_ARN }},containerName=${{ env.ECR_FRONTEND_REPO }},containerPort=80"S
+              --load-balancers "targetGroupArn=${{ env.FE_TG_ARN }},containerName=${{ env.ECR_FRONTEND_REPO }},containerPort=80"
+          fi

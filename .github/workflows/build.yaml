@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/ai-agent
 env:
   AWS_REGION: us-east-1
   ECR_FRONTEND_REPO: rca-frontend

@@ -1,6 +1,7 @@
 import os
 from pydantic_settings import BaseSettings
 from typing import Optional
+from urllib.parse import quote_plus
 
 
 class Settings(BaseSettings):
@@ -23,7 +24,10 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+        encoded_user = quote_plus(self.DB_USER)
+        encoded_password = quote_plus(self.DB_PASSWORD)
+        return f"postgresql+asyncpg://{encoded_user}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"

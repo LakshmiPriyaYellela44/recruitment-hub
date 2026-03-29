@@ -13,7 +13,8 @@ connect_args = {}
 if settings.async_database_url and "postgresql" in settings.async_database_url:
     # PostgreSQL-specific settings
     connect_args = {
-        "server_settings": {"application_name": settings.APP_NAME}
+        "server_settings": {"application_name": settings.APP_NAME},
+        "ssl": "require"  # RDS often needs SSL, "require" is safer than "prefer" here
     }
 # SQLite doesn't need additional connect_args
 
@@ -80,15 +81,18 @@ async def init_db():
         except Exception as e:
             retries += 1
             if retries < max_retries:
+                # Capture as much error detail as possible
+                error_summary = str(e) if str(e) else f"{type(e).__name__}"
                 logger.warning(
-                    f"✗ Database connection failed: {str(e)}. "
+                    f"✗ Database connection failed: {error_summary}. "
                     f"Retrying in {retry_delay}s... ({retries}/{max_retries})"
                 )
                 await asyncio.sleep(retry_delay)
             else:
+                error_summary = str(e) if str(e) else f"{type(e).__name__}"
                 logger.error(
                     f"✗ Failed to connect to database after {max_retries} attempts. "
-                    f"Error: {str(e)}"
+                    f"Error: {error_summary}"
                 )
                 raise
 

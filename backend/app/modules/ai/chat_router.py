@@ -33,8 +33,7 @@ def get_current_user_optional(request = None):
 from app.modules.ai.query_parser import get_query_parser
 from app.modules.ai.candidate_search import get_candidate_ranker
 from app.modules.ai.resume_scorer import ResumeScorer
-from app.modules.candidate.models import Candidate
-from app.modules.recruiter.models import Recruiter
+
 
 logger = logging.getLogger(__name__)
 

@@ -14,3 +14,6 @@ PyPDF2
 python-docx
 python-dotenv
  
+asyncpg
+greenlet
+ 

@@ -1,6 +1,7 @@
 """WebSocket router for recruiter email sending with live status updates."""
 import logging
 import json
+import asyncio
 from fastapi import APIRouter, WebSocket, Depends, status, Query
 from uuid import UUID
 from app.core.database import get_db
@@ -46,18 +47,31 @@ async def websocket_send_email(
     logger.info(f"[WebSocket] Dynamic Data: {dynamic_data}")
     
     # Get current user
+    current_user = None
     try:
         logger.info("[WebSocket] Attempting to authenticate user...")
         current_user = await get_current_user_ws(websocket)
         logger.info(f"[WebSocket] User authenticated: {current_user.email}")
     except Exception as e:
-        logger.error(f"[WebSocket] Authentication failed: {e}")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=str(e))
+        logger.error(f"[WebSocket] Authentication failed: {e}", exc_info=True)
+        await websocket.accept()
+        await websocket.send_json({
+            "status": "error",
+            "message": "Authentication failed",
+            "error": str(e)
+        })
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
         return
     
     # Check if recruiter
     if current_user.role.value != "RECRUITER":
         logger.error(f"[WebSocket] User is not recruiter: {current_user.role.value}")
+        await websocket.accept()
+        await websocket.send_json({
+            "status": "error",
+            "message": "Authorization failed",
+            "error": "Only recruiters can send emails"
+        })
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
             reason="Only recruiters can send emails"
@@ -65,8 +79,15 @@ async def websocket_send_email(
         return
     
     # Check PRO subscription
-    if current_user.subscription_type != "PRO":
-        logger.error(f"[WebSocket] User does not have PRO subscription: {current_user.subscription_type}")
+    subscription_value = current_user.subscription_type.value if hasattr(current_user.subscription_type, 'value') else str(current_user.subscription_type)
+    if subscription_value != "PRO":
+        logger.error(f"[WebSocket] User does not have PRO subscription: {subscription_value}")
+        await websocket.accept()
+        await websocket.send_json({
+            "status": "error",
+            "message": "Upgrade required",
+            "error": "PRO subscription required to send emails. Please upgrade your account."
+        })
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
             reason="PRO subscription required to send emails"
@@ -144,12 +165,22 @@ async def websocket_send_email(
         
         # Send success status
         logger.info(f"[WebSocket] Email sent successfully with result: {result}")
-        await websocket.send_json({
-            "status": "success",
-            "message": "Email sent successfully!",
-            "message_id": result.get("message_id"),
-            "timestamp": result.get("timestamp")
-        })
+        logger.info(f"[WebSocket] About to send success message via WebSocket")
+        try:
+            await websocket.send_json({
+                "status": "success",
+                "message": "Email sent successfully!",
+                "message_id": result.get("email_id") or result.get("message_id"),
+                "recipient": result.get("recipient"),
+                "template_name": result.get("template_name")
+            })
+            logger.info(f"[WebSocket] ✓ Success message sent to client")
+        except Exception as send_error:
+            logger.error(f"[WebSocket] ✗ Failed to send success message: {send_error}")
+            raise
+        
+        # Add delay to ensure success message is fully sent
+        await asyncio.sleep(1.2)
         
     except Exception as e:
         logger.error(f"[WebSocket] Error sending email: {e}", exc_info=True)
@@ -192,6 +223,8 @@ async def websocket_send_email(
     
     finally:
         try:
+            # Add delay to ensure success message is delivered and visible
+            await asyncio.sleep(3.5)
             await websocket.close()
             logger.info("[WebSocket] Connection closed")
         except Exception as e:

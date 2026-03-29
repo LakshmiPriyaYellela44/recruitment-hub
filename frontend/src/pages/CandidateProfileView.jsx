@@ -85,20 +85,38 @@ export const CandidateProfileView = () => {
           </div>
 
           {showEmailForm && (
-            <EmailSendLive
-              candidateId={candidate.id}
-              candidateName={`${candidate.first_name} ${candidate.last_name}`}
-              candidateEmail={candidate.email}
-              token={localStorage.getItem('access_token')}
-              onSuccess={(result) => {
-                console.log('Email sent successfully:', result.message_id);
-                setShowEmailForm(false);
-              }}
-              onError={(error) => {
-                console.error('Email sending failed:', error.message);
-              }}
-              onClose={() => setShowEmailForm(false)}
-            />
+            (() => {
+              // Extract email from latest resume parsed data, fall back to candidate.email
+              const latestResume = candidate.resumes && candidate.resumes.length > 0 ? candidate.resumes[0] : null;
+              const parsedEmail = latestResume?.parsed_data?.email || candidate.email;
+              
+              if (!parsedEmail) {
+                return (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-700 font-semibold">
+                      ⚠️ No email found for this candidate. Please ensure candidate has a valid email.
+                    </p>
+                  </div>
+                );
+              }
+              
+              return (
+                <EmailSendLive
+                  candidateId={candidate.id}
+                  candidateName={`${candidate.first_name} ${candidate.last_name}`}
+                  candidateEmail={parsedEmail}
+                  token={localStorage.getItem('access_token')}
+                  onSuccess={(result) => {
+                    console.log('Email sent successfully:', result.message_id);
+                    setShowEmailForm(false);
+                  }}
+                  onError={(error) => {
+                    console.error('Email sending failed:', error.message);
+                  }}
+                  onClose={() => setShowEmailForm(false)}
+                />
+              );
+            })()
           )}
 
           <div className="space-y-8">

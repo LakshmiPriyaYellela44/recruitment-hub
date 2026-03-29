@@ -209,19 +209,35 @@ export const CandidateProfilePage = () => {
                   📧 Send Email
                 </button>
                 {showEmailModal && (
-                  <EmailSendLive
-                    candidateId={candidateId}
-                    candidateName={`${candidate.first_name} ${candidate.last_name}`}
-                    candidateEmail={candidate.email}
-                    token={localStorage.getItem('access_token')}
-                    onClose={() => setShowEmailModal(false)}
-                    onSuccess={() => {
-                      setShowEmailModal(false);
-                    }}
-                    onError={(err) => {
-                      console.error('Email sending error:', err);
-                    }}
-                  />
+                  (() => {
+                    // Extract email from latest resume parsed data, fall back to candidate.email
+                    const latestResume = candidate.resumes && candidate.resumes.length > 0 ? candidate.resumes[0] : null;
+                    const parsedEmail = latestResume?.parsed_data?.email || candidate.email;
+                    
+                    if (!parsedEmail) {
+                      return (
+                        <div className="email-error-message">
+                          <p>⚠️ No email found for this candidate. Please ensure candidate has a valid email.</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <EmailSendLive
+                        candidateId={candidateId}
+                        candidateName={`${candidate.first_name} ${candidate.last_name}`}
+                        candidateEmail={parsedEmail}
+                        token={localStorage.getItem('access_token')}
+                        onClose={() => setShowEmailModal(false)}
+                        onSuccess={() => {
+                          setShowEmailModal(false);
+                        }}
+                        onError={(err) => {
+                          console.error('Email sending error:', err);
+                        }}
+                      />
+                    );
+                  })()
                 )}
               </div>
             )}

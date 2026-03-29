@@ -65,7 +65,7 @@ export const EmailSendLive = ({
   const [dynamicData, setDynamicData] = useState({});
   const [hasStarted, setHasStarted] = useState(false);
   
-  const { sendEmail, status, message, messageId, error, isLoading, close } = useWebSocketEmailSend();
+  const { sendEmail, status, message, messageId, error } = useWebSocketEmailSend();
 
   // Fetch email templates on mount
   useEffect(() => {
@@ -98,6 +98,18 @@ export const EmailSendLive = ({
       setDynamicData(initialData);
     }
   }, [selectedTemplate]);
+
+  // Debug: log status changes
+  useEffect(() => {
+    console.log('[EmailSendLive] Status changed to:', status);
+    console.log('[EmailSendLive] Current render state:', {
+      templateLoading,
+      hasStarted,
+      status,
+      message,
+      messageId
+    });
+  }, [status]);
 
   const handleSendEmail = async (e) => {
     e.preventDefault();
@@ -233,7 +245,7 @@ export const EmailSendLive = ({
                     {placeholders.map((placeholder) => (
                       <div key={placeholder} className="form-group">
                         <label htmlFor={`data-${placeholder}`}>
-                          {placeholder.replace(/_/g, ' ').toLowerCase()} <span className="required">*</span>
+                          {placeholder.replaceAll('_', ' ').toLowerCase()} <span className="required">*</span>
                         </label>
                         <input
                           id={`data-${placeholder}`}
@@ -244,7 +256,7 @@ export const EmailSendLive = ({
                             [placeholder]: e.target.value
                           })}
                           className="form-input"
-                          placeholder={`Enter ${placeholder.replace(/_/g, ' ').toLowerCase()}`}
+                          placeholder={`Enter ${placeholder.replaceAll('_', ' ').toLowerCase()}`}
                           required
                         />
                       </div>
@@ -282,7 +294,8 @@ export const EmailSendLive = ({
     );
   }
 
-  // Success view
+  // DEBUG: Check what status is before trying to render success
+  console.log('[EmailSendLive] Checking success view - status is:', status, 'hasStarted:', hasStarted);
   if (status === 'success') {
     return (
       <div className="email-modal-overlay" onClick={onClose}>
@@ -303,10 +316,6 @@ export const EmailSendLive = ({
               <div className="success-icon">✓</div>
               <h3>Success!</h3>
               <p>Email sent to <strong>{candidateEmail}</strong></p>
-              <div className="message-id">
-                <p><strong>Message ID:</strong></p>
-                <code>{messageId}</code>
-              </div>
               <p className="success-message">{message}</p>
             </div>
 

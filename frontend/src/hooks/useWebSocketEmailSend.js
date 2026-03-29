@@ -16,6 +16,7 @@ export const useWebSocketEmailSend = () => {
   const [isLoading, setIsLoading] = useState(false);
   const wsRef = useRef(null);
   const timeoutRef = useRef(null);
+  const messageHandledRef = useRef(false);
 
   const sendEmail = useCallback((candidateId, candidateEmail, templateId, dynamicData, token) => {
     return new Promise((resolve, reject) => {
@@ -24,6 +25,7 @@ export const useWebSocketEmailSend = () => {
       setMessage('');
       setError('');
       setMessageId('');
+      messageHandledRef.current = false;
 
       try {
         // Validate inputs
@@ -80,14 +82,17 @@ export const useWebSocketEmailSend = () => {
         };
 
         ws.onmessage = (event) => {
+          console.log('[WebSocket] 📨 RAW MESSAGE RECEIVED:', event.data);
           try {
             const data = JSON.parse(event.data);
             console.log('[WebSocket] ✓ Message received:', data);
 
             const { status: msgStatus, message: msgText, message_id, error: msgError } = data;
 
+            console.log('[WebSocket] Setting status to:', msgStatus);
             setStatus(msgStatus);
             setMessage(msgText);
+            console.log('[WebSocket] State updated - status:', msgStatus, 'message:', msgText);
 
             if (msgStatus === 'sending') {
               console.log('[WebSocket] Status: sending...');
@@ -95,13 +100,21 @@ export const useWebSocketEmailSend = () => {
             } else if (msgStatus === 'success') {
               console.log('[WebSocket] Status: success!', message_id);
               clearTimeout(timeoutRef.current);
+              messageHandledRef.current = true;
               setMessageId(message_id);
+              setStatus('success');
               setIsLoading(false);
+              console.log('[WebSocket] States set: messageId, status=success, isLoading=false');
               ws.close();
-              resolve({ success: true, message_id });
+              // Wait for React to render the success state before resolving
+              setTimeout(() => {
+                console.log('[WebSocket] Resolving promise after 1500ms delay');
+                resolve({ success: true, message_id });
+              }, 1500);
             } else if (msgStatus === 'error') {
               console.error('[WebSocket] Status: error -', msgError);
               clearTimeout(timeoutRef.current);
+              messageHandledRef.current = true;
               setError(msgError || msgText);
               setIsLoading(false);
               ws.close();
@@ -133,15 +146,17 @@ export const useWebSocketEmailSend = () => {
         };
 
         ws.onclose = (event) => {
-          console.log('[WebSocket] Connection closed:', {
+          console.log('[WebSocket] 🔌 Connection closed:', {
             code: event.code,
             reason: event.reason,
-            wasClean: event.wasClean
+            wasClean: event.wasClean,
+            messageHandled: messageHandledRef.current
           });
           clearTimeout(timeoutRef.current);
 
-          // If connection closed unexpectedly (not after success/error)
-          if (isLoading && status !== 'success' && status !== 'error') {
+          // If connection closed unexpectedly (not after success/error was handled)
+          if (!messageHandledRef.current) {
+            console.error('[WebSocket] ✗ Connection closed before message was handled');
             setStatus('error');
             setError(`Connection closed unexpectedly (code: ${event.code}). Please try again.`);
             setIsLoading(false);

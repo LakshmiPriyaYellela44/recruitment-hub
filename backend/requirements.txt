@@ -16,4 +16,4 @@ python-dotenv
  
 asyncpg
 greenlet
- 
+email-validator 

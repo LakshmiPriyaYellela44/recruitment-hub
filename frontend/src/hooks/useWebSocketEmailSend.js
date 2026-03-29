@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
 
 /**
- * Custom hook for WebSocket email sending with real-time status updates.
- * 
- * Usage:
- * const { sendEmail, status, message, messageId, error, isLoading } = useWebSocketEmailSend();
- * 
- * await sendEmail(candidateId, subject, body);
- */
+* Custom hook for WebSocket email sending with real-time status updates.
+* 
+* Usage:
+* const { sendEmail, status, message, messageId, error, isLoading } = useWebSocketEmailSend();
+* 
+* await sendEmail(candidateId, subject, body);
+*/
 export const useWebSocketEmailSend = () => {
   const [status, setStatus] = useState('idle'); // idle, sending, success, error
   const [message, setMessage] = useState('');
@@ -38,19 +38,18 @@ export const useWebSocketEmailSend = () => {
 
         // Get WebSocket protocol (ws or wss based on location protocol)
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        
+
         // Get backend host from environment or default to current host
-        // Use VITE_API_URL to extract the backend host
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-        const apiUrlObj = new URL(apiUrl);
-        const backendHost = apiUrlObj.host;
-        
+        // Use VITE_API_URL or window.location.host for relative paths
+        const apiUrl = import.meta.env.VITE_API_URL || '/api';
+        const backendHost = apiUrl.startsWith('http') ? new URL(apiUrl).host : window.location.host;
+
         // Serialize dynamic data to JSON string
         const dynamicDataStr = JSON.stringify(dynamicData || {});
-        
+
         // Build WebSocket URL with proper escaping using backend host
         const wsUrl = `${wsProtocol}//${backendHost}/api/recruiters/ws/send-email/${candidateId}?template_id=${encodeURIComponent(templateId)}&candidate_email=${encodeURIComponent(candidateEmail)}&dynamic_data=${encodeURIComponent(dynamicDataStr)}&token=${token}`;
-        
+
         console.log('[WebSocket] Connection details:');
         console.log('  URL:', wsUrl.replace(token, 'TOKEN').replace(dynamicDataStr, 'DATA'));
         console.log('  Protocol:', wsProtocol);
@@ -140,7 +139,7 @@ export const useWebSocketEmailSend = () => {
             wasClean: event.wasClean
           });
           clearTimeout(timeoutRef.current);
-          
+
           // If connection closed unexpectedly (not after success/error)
           if (isLoading && status !== 'success' && status !== 'error') {
             setStatus('error');
@@ -178,3 +177,4 @@ export const useWebSocketEmailSend = () => {
     close
   };
 };
+ 

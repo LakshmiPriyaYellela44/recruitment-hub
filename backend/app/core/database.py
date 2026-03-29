@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Create async engine with proper config for SQLite vs PostgreSQL
 connect_args = {}
-if "postgresql" in settings.DATABASE_URL:
+if settings.async_database_url and "postgresql" in settings.async_database_url:
     # PostgreSQL-specific settings
     connect_args = {
         "server_settings": {"application_name": settings.APP_NAME}
@@ -18,7 +18,7 @@ if "postgresql" in settings.DATABASE_URL:
 # SQLite doesn't need additional connect_args
 
 engine: AsyncEngine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.async_database_url,
     pool_pre_ping=True,
     echo=settings.DEBUG,
     connect_args=connect_args
@@ -46,7 +46,7 @@ async def get_db():
 
 async def init_db():
     """Initialize database with all models.
-    
+
     This function:
     - Retries connection if DB not available
     - Creates all tables if they don't exist
@@ -56,27 +56,27 @@ async def init_db():
     retries = 0
     max_retries = settings.DB_CONNECTION_RETRIES
     retry_delay = settings.DB_CONNECTION_RETRY_DELAY
-    
+
     while retries < max_retries:
         try:
             logger.info(f"Attempting to connect to database (attempt {retries + 1}/{max_retries})...")
-            
+
             # Test connection
             async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
                 logger.info("✓ Database connection successful")
-            
+
             # Create all tables
             logger.info("Creating database tables...")
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("✓ All database tables created successfully")
-            
+
             # Seed test data if database is empty
             await seed_test_data()
-            
+
             return
-            
+
         except Exception as e:
             retries += 1
             if retries < max_retries:
@@ -100,15 +100,15 @@ async def seed_test_data():
         from app.core.security import get_password_hash
         from app.core.seed_data import seed_email_templates
         from sqlalchemy import select, func
-        
+
         async with AsyncSessionLocal() as session:
             # Check if any users exist
             result = await session.execute(select(func.count(User.id)))
             user_count = result.scalar() or 0
-            
+
             if user_count == 0:
                 logger.info("Database is empty, seeding test data...")
-                
+
                 # Create test recruiter (John)
                 recruiter = User(
                     email="recruiter@example.com",
@@ -118,7 +118,7 @@ async def seed_test_data():
                     role=UserRole.RECRUITER,
                     is_active=True
                 )
-                
+
                 # Create test candidate
                 candidate = User(
                     email="candidate@example.com",
@@ -128,7 +128,7 @@ async def seed_test_data():
                     role=UserRole.CANDIDATE,
                     is_active=True
                 )
-                
+
                 # Create bob (recruiter)
                 bob = User(
                     email="bob@example.com",
@@ -138,7 +138,7 @@ async def seed_test_data():
                     role=UserRole.RECRUITER,
                     is_active=True
                 )
-                
+
                 # Create default admin user
                 admin = User(
                     email="admin@example.com",
@@ -148,13 +148,13 @@ async def seed_test_data():
                     role=UserRole.ADMIN,
                     is_active=True
                 )
-                
+
                 session.add(recruiter)
                 session.add(candidate)
                 session.add(bob)
                 session.add(admin)
                 await session.commit()
-                
+
                 logger.info("✓ Test data seeded successfully")
                 logger.info("  - Recruiter (John): recruiter@example.com / password123")
                 logger.info("  - Candidate (Jane): candidate@example.com / password123")
@@ -162,10 +162,10 @@ async def seed_test_data():
                 logger.info("  - Admin (User): admin@example.com / admin123")
             else:
                 logger.info(f"Database already has {user_count} users, skipping user seed")
-            
+
             # Seed email templates (independent of user count)
             await seed_email_templates(session)
-                
+
     except Exception as e:
         logger.warning(f"Could not seed test data: {str(e)}")
 
@@ -175,3 +175,4 @@ async def close_db():
     logger.info("Closing database connections...")
     await engine.dispose()
     logger.info("✓ Database connections closed")
+ 

@@ -82,7 +82,7 @@ export function AIChatBox() {
         setMessages([]);  // Clear messages if not authenticated
         return;
       }
-      const response = await fetch(`${API_BASE_URL}/api/ai/chat/history`, {
+      const response = await fetch(`${API_BASE_URL}/ai/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -156,7 +156,7 @@ export function AIChatBox() {
         return;
       }
       
-      const response = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
+      const response = await fetch(`${API_BASE_URL}/ai/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

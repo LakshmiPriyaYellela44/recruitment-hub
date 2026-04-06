@@ -165,7 +165,7 @@ const ResumesTab = ({ profile, onUpdate }) => {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [deleting, setDeleting] = useState(null);
-  const [viewing, setViewing] = useState(null); // Track which resume is being viewed
+  const [downloading, setDownloading] = useState(null); // Track which resume is being downloaded
   const [resumes, setResumes] = useState(profile?.resumes || []);
   const [selectedResume, setSelectedResume] = useState(null); // Track selected (latest) resume
 
@@ -248,28 +248,42 @@ const ResumesTab = ({ profile, onUpdate }) => {
         console.log('[UPLOAD_SUCCESS] Profile refreshed successfully');
       }
     } catch (err) {
-      if (err.message === 'Resume parsing took too long') {
-        setMessage('Resume is being processed in the background. Please refresh the page in a moment.');
-      } else {
-        setMessage(err.message || 'Failed to upload resume');
+      console.error('[UPLOAD_ERROR] Upload/parsing error:', err);
+      
+      // Extract detailed error message from API response if available
+      let errorMessage = 'Failed to upload resume';
+      
+      if (err.response?.data?.detail) {
+        // API returned validation error
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.status === 422) {
+        // Validation error - bad file
+        errorMessage = 'Resume validation failed. Please upload a valid PDF or Word document with actual content.';
+      } else if (err.message === 'Resume parsing took too long') {
+        errorMessage = 'Resume is being processed in the background. Please refresh the page in a moment.';
+      } else if (err.message) {
+        errorMessage = err.message;
       }
+      
+      setMessage(errorMessage);
       setMessageType('error');
+      setFile(null); // Clear the selected file so user can try again
     } finally {
       setUploading(false);
     }
   };
 
-  const handleView = async (resumeId, fileName) => {
-    setViewing(resumeId);
+  const handleDownload = async (resumeId, fileName) => {
+    setDownloading(resumeId);
     try {
-      await resumeService.viewResume(resumeId);
-      console.log(`Resume ${fileName} opened in new tab`);
+      await resumeService.downloadResume(resumeId);
+      console.log(`Resume ${fileName} downloaded`);
     } catch (err) {
-      console.error('Failed to view resume:', err);
-      setMessage(`Failed to view resume: ${err.message || 'Unknown error'}`);
+      console.error('Failed to download resume:', err);
+      setMessage(`Failed to download resume: ${err.message || 'Unknown error'}`);
       setMessageType('error');
     } finally {
-      setViewing(null);
+      setDownloading(null);
     }
   };
 
@@ -389,18 +403,40 @@ const ResumesTab = ({ profile, onUpdate }) => {
                   <td className="px-4 py-3 text-center">
                     <div className="flex gap-2 justify-center">
                       <button
-                        onClick={() => handleView(resume.id, resume.file_name)}
-                        disabled={viewing === resume.id}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-sm rounded font-medium transition"
+                        onClick={() => handleDownload(resume.id, resume.file_name)}
+                        disabled={downloading === resume.id}
+                        className="p-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded font-medium transition"
+                        title="Download resume"
                       >
-                        {viewing === resume.id ? 'Opening...' : 'View'}
+                        {downloading === resume.id ? (
+                          <span className="inline-block animate-spin">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        )}
                       </button>
                       <button
                         onClick={() => handleDelete(resume.id)}
                         disabled={deleting === resume.id}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-sm rounded font-medium transition"
+                        className="p-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded font-medium transition"
+                        title="Delete resume"
                       >
-                        {deleting === resume.id ? 'Deleting...' : 'Delete'}
+                        {deleting === resume.id ? (
+                          <span className="inline-block animate-spin">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3.5z" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </td>

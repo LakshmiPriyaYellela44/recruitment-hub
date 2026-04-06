@@ -107,19 +107,54 @@ class RecruiterService:
         )
         active_resume = resume_result.scalars().first()
         
+        # Only include the latest resume (not all resumes)
+        if active_resume:
+            response["resumes"] = [
+                {
+                    "id": str(active_resume.id),
+                    "file_name": active_resume.file_name,
+                    "file_type": active_resume.file_type,
+                    "status": active_resume.status,
+                    "created_at": active_resume.created_at.isoformat() if active_resume.created_at else None,
+                    "is_latest": True,
+                    "s3_key": active_resume.s3_key
+                }
+            ]
+        
         if active_resume and active_resume.parsed_data:
             parsed = active_resume.parsed_data
             response["parsed_data"] = parsed
             
             # Extract structured data from parsed resume
             if parsed.get('skills'):
-                response["skills"] = parsed.get('skills', [])[:20]  # Top 20 skills
+                response["skills"] = [
+                    {
+                        "name": skill if isinstance(skill, str) else skill.get('name', skill),
+                        "proficiency": skill.get('proficiency', 'INTERMEDIATE') if isinstance(skill, dict) else 'INTERMEDIATE'
+                    }
+                    for skill in parsed.get('skills', [])[:20]
+                ]
             
             if parsed.get('experiences'):
-                response["experiences"] = parsed.get('experiences', [])[:5]  # Last 5 jobs
+                response["experiences"] = [
+                    {
+                        "job_title": exp.get('job_title', exp.get('title', 'N/A')) if isinstance(exp, dict) else 'N/A',
+                        "company": exp.get('company', 'N/A') if isinstance(exp, dict) else 'N/A',
+                        "duration": exp.get('duration', '') if isinstance(exp, dict) else '',
+                        "description": exp.get('description', exp.get('summary', '')) if isinstance(exp, dict) else ''
+                    }
+                    for exp in parsed.get('experiences', [])[:5]
+                ]
             
             if parsed.get('educations'):
-                response["educations"] = parsed.get('educations', [])
+                response["educations"] = [
+                    {
+                        "degree": edu.get('degree', 'N/A') if isinstance(edu, dict) else 'N/A',
+                        "institution": edu.get('institution', edu.get('school', 'N/A')) if isinstance(edu, dict) else 'N/A',
+                        "field_of_study": edu.get('field_of_study', edu.get('field', '')) if isinstance(edu, dict) else ''
+                    }
+                    for edu in parsed.get('educations', [])
+                ]
         
         return response
     

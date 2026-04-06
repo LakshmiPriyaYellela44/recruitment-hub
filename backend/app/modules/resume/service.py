@@ -3,6 +3,7 @@ from app.core.models import Resume, User
 from app.core.exceptions import NotFoundException, ValidationException
 from app.modules.resume.repository import ResumeRepository
 from app.modules.resume.parser import ResumeParser
+from app.modules.resume.validator import ResumeValidator
 from app.modules.candidate.service import CandidateService
 from app.aws_services.s3_client import S3Client
 from app.events.config import EventConfig
@@ -22,13 +23,12 @@ class ResumeService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repository = ResumeRepository(db)
-        self.s3_client = S3Client()  # Uses factory to get mock or real S3
+        self.s3_client = S3Client()  # Real AWS S3
         # Use SNS client from event configuration
         self.sns_client = EventConfig.get_sns_client()
     
     async def upload_resume(self, user_id: UUID, file: UploadFile) -> Resume:
         """Upload and process resume."""
-        logger.info(f"[upload_resume] ================== START ==================")
         logger.info(f"[upload_resume] user_id: {user_id}, filename: {file.filename}")
         
         try:
@@ -52,9 +52,25 @@ class ResumeService:
                 logger.error(f"[upload_resume] File is empty")
                 raise ValidationException("Resume file cannot be empty")
             
+            # ✅ VALIDATE FILE INTEGRITY (check if it's a real PDF/DOCX, not corrupted)
+            logger.info(f"[upload_resume] Validating file integrity for file_ext={file_ext}...")
+            is_valid, integrity_error = ResumeValidator.validate_file_integrity(content, file_ext)
+            if not is_valid:
+                logger.error(f"[upload_resume] File integrity validation failed: {integrity_error}")
+                raise ValidationException(integrity_error)
+            logger.info(f"[upload_resume]  File integrity validation passed for {file_ext}")
+            
+            # ✅ STRONG VALIDATION: Check for actual resume structure (Experience, Skills, Education, Contact)
+            logger.info(f"[upload_resume] Validating resume structure and content...")
+            is_valid_resume, resume_error = ResumeValidator.validate_resume_structure(content, file_ext)
+            if not is_valid_resume:
+                logger.error(f"[upload_resume]  Resume structure validation failed: {resume_error}")
+                raise ValidationException(resume_error)
+            logger.info(f"[upload_resume]  Resume structure validation passed")
+            
             # Generate unique file name
             unique_filename = f"{user_id}_{uuid4().hex}_{file.filename}"
-            logger.info(f"[upload_resume] Generated unique filename: {unique_filename}")
+            logger.info(f"[upload_resume] Generated unique filename: {unique_filename}, file_ext: {file_ext}")
             
             # Upload to S3 (mock)
             logger.info(f"[upload_resume] Uploading to S3...")
@@ -65,15 +81,15 @@ class ResumeService:
             logger.info(f"[upload_resume] Verifying S3 upload...")
             verify_content = await self.s3_client.download_file(s3_key)
             if verify_content is None:
-                logger.error(f"[upload_resume] ❌ S3 verification failed - file exists but could not be retrieved")
+                logger.error(f"[upload_resume]  S3 verification failed - file exists but could not be retrieved")
                 raise ValidationException("Resume upload verification failed - file could not be retrieved from S3")
             if len(verify_content) != file_size:
-                logger.error(f"[upload_resume] ❌ S3 verification failed - size mismatch. Expected {file_size}, got {len(verify_content)}")
+                logger.error(f"[upload_resume]  S3 verification failed - size mismatch. Expected {file_size}, got {len(verify_content)}")
                 raise ValidationException("Resume upload verification failed - file size mismatch")
-            logger.info(f"[upload_resume] ✅ S3 upload verified successfully")
+            logger.info(f"[upload_resume]  S3 upload verified successfully")
             
             # Create resume record
-            logger.info(f"[upload_resume] Creating resume record in database...")
+            logger.info(f"[upload_resume] Creating resume record in database with file_type={file_ext}...")
             resume = Resume(
                 user_id=user_id,
                 file_name=file.filename,
@@ -85,21 +101,21 @@ class ResumeService:
             
             logger.info(f"[upload_resume] Resume object created: id={resume.id if hasattr(resume, 'id') else 'not-yet-assigned'}")
             created_resume = await self.repository.create_resume(resume)
-            logger.info(f"[upload_resume] ✅ Resume record SAVED to database: id={created_resume.id}")
+            logger.info(f"[upload_resume]  Resume record SAVED to database: id={created_resume.id}")
             
             # If sync parsing is enabled, parse immediately (development mode)
             if settings.RESUME_SYNC_PARSING:
                 logger.info(f"[upload_resume] SYNC_PARSING_ENABLED - parsing immediately")
                 try:
                     await self.process_resume(created_resume.id)
-                    logger.info(f"[upload_resume] ✅ Resume parsed successfully")
+                    logger.info(f"[upload_resume]  Resume parsed successfully")
                     
                     # Refresh resume to get updated status and parsed_data
                     updated_resume = await self.repository.get_resume_by_id(created_resume.id)
                     logger.info(f"[upload_resume] Refreshed resume status: {updated_resume.status}")
                     created_resume = updated_resume
                 except Exception as e:
-                    logger.error(f"[upload_resume] ❌ Error parsing resume: {str(e)}", exc_info=True)
+                    logger.error(f"[upload_resume]  Error parsing resume: {str(e)}", exc_info=True)
                     # Don't fail the upload if parsing fails, parsing can be retried
                     # Return resume with FAILED status if parsing failed
                     updated_resume = await self.repository.get_resume_by_id(created_resume.id)
@@ -117,7 +133,7 @@ class ResumeService:
                         "file_type": file_ext
                     }
                 )
-                logger.info(f"[upload_resume] ✅ Resume upload event published to SNS")
+                logger.info(f"[upload_resume]  Resume upload event published to SNS")
             
             # Log audit
             await log_audit(
@@ -129,14 +145,14 @@ class ResumeService:
                 {"file_name": file.filename}
             )
             
-            logger.info(f"[upload_resume] ================== SUCCESS ==================")
+            
             return created_resume
             
         except ValidationException as e:
-            logger.error(f"[upload_resume] ❌ ValidationException: {str(e)}")
+            logger.error(f"[upload_resume] ValidationException: {str(e)}")
             raise
         except Exception as e:
-            logger.error(f"[upload_resume] ❌ Exception: {str(e)}", exc_info=True)
+            logger.error(f"[upload_resume]  Exception: {str(e)}", exc_info=True)
             raise ValidationException(f"Resume upload failed: {str(e)}")
     
     async def process_resume(self, resume_id: UUID) -> Resume:
@@ -166,6 +182,8 @@ class ResumeService:
                 raise Exception(f"Resume parsing failed: {error_msg}")
             
             logger.info(f"[process_resume] ✓ Parsed resume, extracted: {len(parsed_data.get('skills', []))} skills, {len(parsed_data.get('experiences', []))} experiences, {len(parsed_data.get('educations', []))} educations")
+            
+            logger.info(f"[process_resume] Validation checks skipped for now")
             
             # 3. CRITICAL: Set all previous resumes to is_active=FALSE
             logger.info(f"[process_resume] Setting previous resumes to inactive for user_id={resume.user_id}")
@@ -247,7 +265,7 @@ class ResumeService:
                             await self.db.flush()
                             logger.info(f"[process_resume] ✓ Updated email for user_id={resume.user_id}: {old_email} → {email}")
                         else:
-                            logger.warning(f"[process_resume] ⚠️ Email {email} already in use, skipping email update")
+                            logger.warning(f"[process_resume]  Email {email} already in use, skipping email update")
             
             # 7. Mark as PARSED
             resume.parsed_data = parsed_data
@@ -257,7 +275,7 @@ class ResumeService:
             
             # 8. ATOMIC COMMIT - All changes at once
             await self.db.commit()
-            logger.info(f"[process_resume] ✅ ATOMIC COMMIT complete for resume_id={resume_id}")
+            logger.info(f"[process_resume]  ATOMIC COMMIT complete for resume_id={resume_id}")
             
             # 9. VERIFICATION: Query to confirm all data persisted
             from sqlalchemy import select, func
@@ -283,7 +301,7 @@ class ResumeService:
             verified_experiences = exp_check.scalar() or 0
             verified_educations = edu_check.scalar() or 0
             
-            logger.info(f"[process_resume] ✅ VERIFICATION: {verified_skills} skills, {verified_experiences} experiences, {verified_educations} educations in database")
+            logger.info(f"[process_resume] VERIFICATION: {verified_skills} skills, {verified_experiences} experiences, {verified_educations} educations in database")
             
             # 10. Refresh resume from DB
             updated_resume = await self.repository.get_resume_by_id(resume_id)
@@ -307,7 +325,7 @@ class ResumeService:
             return updated_resume
             
         except Exception as e:
-            logger.error(f"[process_resume] ❌ ERROR: {str(e)}", exc_info=True)
+            logger.error(f"[process_resume] ERROR: {str(e)}", exc_info=True)
             
             # Rollback on error
             try:

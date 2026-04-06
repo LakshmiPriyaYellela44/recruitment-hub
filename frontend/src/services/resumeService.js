@@ -7,48 +7,33 @@ const resumeService = {
   getResume: (id) => client.get(`/resumes/${id}`),
   deleteResume: (id) => client.delete(`/resumes/${id}`),
   
-  viewResume: async (resumeId) => {
-    try {
-      console.log(`Viewing resume: ${resumeId}`);
-      
-      // Construct the view URL
-      const viewUrl = `${client.defaults.baseURL}/resumes/${resumeId}/view`;
-      
-      // Get auth token
-      const token = localStorage.getItem('access_token');
-      
-      // Build query params for auth if needed
-      const urlWithAuth = token ? `${viewUrl}?token=${token}` : viewUrl;
-      
-      // Open in new tab
-      const newWindow = window.open(viewUrl, '_blank', 'noopener,noreferrer');
-      
-      // Add auth header by fetch with auth and creating blob
-      // Actually, the browser will send Authorization header automatically
-      
-      return { success: true, url: viewUrl };
-    } catch (error) {
-      console.error('Resume view failed:', error);
-      throw error;
-    }
-  },
-  
   downloadResume: async (resumeId) => {
     try {
+      console.log(`[ResumeSvc] Downloading resume: ${resumeId}`);
+      
       const response = await client.get(`/resumes/${resumeId}/download`, {
         responseType: 'blob',
       });
       
+      const contentType = response.headers['content-type'];
+      const disposition = response.headers['content-disposition'];
+      
+      console.log(`[ResumeSvc] Download response:
+        ContentType: ${contentType}
+        Disposition: ${disposition}
+        Status: ${response.status}`);
+      
       // Get filename from Content-Disposition header or use default
-      const contentDisposition = response.headers['content-disposition'];
       let filename = 'resume';
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?([^"\\]+)"?/);
+      if (disposition) {
+        const filenameMatch = disposition.match(/filename="?([^"\\]+)"?/);
         if (filenameMatch) filename = filenameMatch[1];
       }
       
+      console.log(`[ResumeSvc] Downloading as: ${filename}`);
+      
       // Create blob URL and download
-      const blob = new Blob([response.data]);
+      const blob = new Blob([response.data], { type: contentType });
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -58,9 +43,10 @@ const resumeService = {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
       
+      console.log('[ResumeSvc] Download completed');
       return { success: true };
     } catch (error) {
-      console.error('Resume download failed:', error);
+      console.error('[ResumeSvc] Resume download failed:', error);
       throw error;
     }
   },

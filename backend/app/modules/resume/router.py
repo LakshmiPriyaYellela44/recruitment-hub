@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.utils.auth_utils import get_current_user
@@ -34,14 +34,16 @@ async def upload_resume(
             s3_key=resume.s3_key
         )
     except ValidationException as e:
+        logger.error(f"[upload_resume] ValidationException: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"[upload_resume] Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Resume upload failed"
+            detail=f"Resume upload failed: {str(e)}"
         )
 
 
@@ -160,18 +162,84 @@ async def download_resume(
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Download resume file."""
-    service = ResumeService(db)
-    resume = await service.get_resume(resume_id, current_user.id)
+    """Download resume file - returns file for download with attachment header."""
+    from uuid import UUID
+    from app.core.exceptions import NotFoundException
     
-    # Get the file from S3 (or local storage)
-    file_path = await service.get_resume_file(resume_id, current_user.id)
-    
-    return FileResponse(
-        path=file_path,
-        filename=resume.file_name,
-        media_type="application/octet-stream"
-    )
+    try:
+        # Validate UUID format
+        try:
+            resume_uuid = UUID(resume_id)
+        except ValueError:
+            logger.error(f"Invalid resume ID format: {resume_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid resume ID format"
+            )
+        
+        logger.info(f"[GET /resumes/{resume_id}/download] user_id={current_user.id}, downloading")
+        
+        service = ResumeService(db)
+        resume = await service.get_resume(resume_uuid, current_user.id)
+        
+        # Download file directly from S3
+        file_content = await service.s3_client.download_file(resume.s3_key)
+        
+        if not file_content:
+            logger.error(f"Resume file not found in S3: {resume.s3_key}")
+            raise NotFoundException("Resume file", str(resume_id))
+        
+        logger.info(f"Downloaded resume from S3: {resume.s3_key} (size: {len(file_content)} bytes)")
+        
+        # Determine media type based on file extension
+        media_type = "application/pdf" if resume.file_type.lower() == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        
+        # Audit log: resume downloaded
+        await log_audit(
+            db,
+            current_user.id,
+            "download_resume",
+            f"Downloaded resume: {resume.file_name}",
+            "success"
+        )
+        
+        return Response(
+            content=file_content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{resume.file_name}\"",
+                "Content-Length": str(len(file_content)),
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
+        )
+    except NotFoundException as e:
+        logger.warning(f"[GET /resumes/{resume_id}/download] Not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"[GET /resumes/{resume_id}/download] Error: {error_msg}", exc_info=True)
+        
+        # Provide helpful error message based on error type
+        if "NoCredentialsError" in error_msg or "credentials" in error_msg.lower():
+            detail = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+        elif "NoSuchBucket" in error_msg:
+            detail = "S3 bucket not found. Please check S3_BUCKET_NAME configuration."
+        elif "NoSuchKey" in error_msg:
+            detail = "Resume file not found in S3. The file may have been deleted."
+        elif "RequestTimeTooSkewed" in error_msg:
+            detail = "System time is out of sync. Please check your system clock."
+        else:
+            detail = f"Failed to download resume: {error_msg}"
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail
+        )
 
 
 @router.get("/{resume_id}/view")
@@ -183,6 +251,7 @@ async def view_resume(
     """View resume in browser - returns file for inline display in new tab."""
     from uuid import UUID
     from app.core.exceptions import NotFoundException
+    import io
     
     try:
         # Validate UUID format
@@ -200,12 +269,14 @@ async def view_resume(
         service = ResumeService(db)
         resume = await service.get_resume(resume_uuid, current_user.id)
         
-        # Get the file from S3
-        file_path = await service.get_resume_file(resume_uuid, current_user.id)
+        # Download file directly from S3
+        file_content = await service.s3_client.download_file(resume.s3_key)
         
-        if not file_path:
-            logger.error(f"Resume file not found: {resume_id}")
+        if not file_content:
+            logger.error(f"Resume file not found in S3: {resume.s3_key}")
             raise NotFoundException("Resume file", str(resume_id))
+        
+        logger.info(f"Downloaded resume from S3: {resume.s3_key} (size: {len(file_content)} bytes)")
         
         # Determine media type based on file extension
         media_type = "application/pdf" if resume.file_type.lower() == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -222,12 +293,17 @@ async def view_resume(
         
         logger.info(f"Resume {resume_id} viewed by user {current_user.id}")
         
-        # Return file with inline disposition (opens in browser)
-        return FileResponse(
-            path=file_path,
-            filename=resume.file_name,
+        # Return file content directly with proper headers for inline display
+        from fastapi.responses import Response
+        
+        return Response(
+            content=file_content,
             media_type=media_type,
-            headers={"Content-Disposition": f"inline; filename=\"{resume.file_name}\""}
+            headers={
+                "Content-Disposition": "inline",
+                "Content-Length": str(len(file_content)),
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
         )
     except NotFoundException as e:
         logger.warning(f"[GET /resumes/{resume_id}/view] Not found: {str(e)}")
@@ -238,10 +314,24 @@ async def view_resume(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[GET /resumes/{resume_id}/view] Error: {str(e)}", exc_info=True)
+        error_msg = str(e)
+        logger.error(f"[GET /resumes/{resume_id}/view] Error: {error_msg}", exc_info=True)
+        
+        # Provide helpful error message based on error type
+        if "NoCredentialsError" in error_msg or "credentials" in error_msg.lower():
+            detail = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+        elif "NoSuchBucket" in error_msg:
+            detail = "S3 bucket not found. Please check S3_BUCKET_NAME configuration."
+        elif "NoSuchKey" in error_msg:
+            detail = "Resume file not found in S3. The file may have been deleted."
+        elif "RequestTimeTooSkewed" in error_msg:
+            detail = "System time is out of sync. Please check your system clock."
+        else:
+            detail = f"Failed to view resume: {error_msg}"
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to view resume"
+            detail=detail
         )
 
 

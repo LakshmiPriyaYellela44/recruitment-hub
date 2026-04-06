@@ -224,9 +224,10 @@ class SQSResumeWorker:
     
     async def poll_queue(self):
         """
-        Poll SQS queue continuously for messages.
+        Poll SQS queue continuously for messages with exponential backoff on errors.
         
         Runs in an infinite loop, fetching messages and processing them.
+        Implements exponential backoff for connection failures.
         """
         logger.info(
             f"Starting queue polling loop",
@@ -238,6 +239,9 @@ class SQSResumeWorker:
         )
         
         self.is_running = True
+        backoff_delay = 1  # Start with 1 second
+        max_backoff_delay = 30  # Max 30 seconds between retries
+        consecutive_errors = 0
         
         while self.is_running:
             try:
@@ -247,6 +251,18 @@ class SQSResumeWorker:
                     max_messages=self.MAX_MESSAGES_PER_POLL,
                     wait_time_seconds=0
                 )
+                
+                # Reset backoff on successful connection
+                if consecutive_errors > 0:
+                    logger.info(
+                        f"SQS connection restored after {consecutive_errors} consecutive errors",
+                        extra={
+                            "queue": self.QUEUE_NAME,
+                            "consecutive_errors": consecutive_errors,
+                        }
+                    )
+                    consecutive_errors = 0
+                    backoff_delay = 1
                 
                 if messages:
                     logger.debug(
@@ -283,16 +299,22 @@ class SQSResumeWorker:
                 await asyncio.sleep(self.POLL_INTERVAL_SECONDS)
             
             except Exception as e:
-                logger.error(
-                    f"Error in queue polling loop",
+                consecutive_errors += 1
+                logger.warning(
+                    f"Error in queue polling loop (will retry with backoff)",
                     extra={
                         "queue": self.QUEUE_NAME,
                         "error": str(e),
-                    },
-                    exc_info=True
+                        "consecutive_errors": consecutive_errors,
+                        "next_retry_in_seconds": backoff_delay,
+                    }
                 )
-                # Continue polling even if error occurs
-                await asyncio.sleep(self.POLL_INTERVAL_SECONDS)
+                
+                # Exponential backoff: wait before retrying
+                await asyncio.sleep(backoff_delay)
+                
+                # Increase backoff delay for next iteration (exponential backoff)
+                backoff_delay = min(backoff_delay * 2, max_backoff_delay)
     
     def stop(self):
         """Stop the polling loop."""

@@ -34,42 +34,54 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # AWS Configuration
-    AWS_ENABLED: bool = False  # Set to True to use real AWS
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
+    # AWS Configuration (ALWAYS ENABLED FOR PRODUCTION)
+    AWS_ENABLED: bool = True  # Always use real AWS in production
+    AWS_ACCESS_KEY_ID: str = ""  # Set via Secrets Manager in ECS
+    AWS_SECRET_ACCESS_KEY: str = ""  # Set via Secrets Manager in ECS
     AWS_REGION: str = "us-east-1"
 
     # S3 Configuration
     S3_BUCKET_NAME: str = "recruitment-resumes-prod"
-    S3_MOCK_ENABLED: bool = False  # Use real S3
-    S3_MOCK_STORAGE_PATH: str = "./storage/resumes"
+    S3_MOCK_ENABLED: bool = False  # Always use real S3
 
     # SNS Configuration
     SNS_TOPIC_ARN: str = "arn:aws:sns:us-east-1:432305066755:recruitment-resume-uploads"
-    SNS_MOCK_ENABLED: bool = False  # Use real SNS
+    SNS_MOCK_ENABLED: bool = False  # Always use real SNS
 
     # SQS Configuration
     SQS_QUEUE_URL: str = "https://sqs.us-east-1.amazonaws.com/432305066755/recruitment-resume-processing"
-    SQS_MOCK_ENABLED: bool = False  # Use real SQS
+    SQS_MOCK_ENABLED: bool = False  # Always use real SQS
     SQS_POLL_INTERVAL_SECONDS: int = 2
     SQS_MAX_MESSAGES_PER_POLL: int = 10
     SQS_VISIBILITY_TIMEOUT_SECONDS: int = 30
     SQS_MAX_RETRIES: int = 3
 
-    # SES Configuration
+    # SES Configuration (ALWAYS USE REAL SES - NEVER MOCK)
     SES_FROM_EMAIL: str = "priyachatgpt44@gmail.com"
-    SES_MOCK_ENABLED: bool = False  # Use real SES
+    SES_MOCK_ENABLED: bool = False  # Always use real SES - never mock
     EMAIL_LOG_PATH: str = "./logs/emails.log"
 
-    # Event Queue
-    QUEUE_MOCK_ENABLED: bool = False  # Use real SQS
+    # Event Queue (ALWAYS USE REAL SQS)
+    QUEUE_MOCK_ENABLED: bool = False  # Always use real SQS
 
     # Resume Processing
     RESUME_SYNC_PARSING: bool = True  # Parse resumes synchronously instead of async (for development)
 
-    # CORS
+    # CORS - Simple list (don't override from .env)
     CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
+
+    # Gemini Configuration
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-1.5-pro"
+    GEMINI_EMBEDDING_MODEL: str = "models/embedding-001"
+
+    # AI Features
+    AI_ENABLED: bool = False
+    AI_RESUME_PARSING_ENABLED: bool = False
+    AI_CANDIDATE_MATCHING_ENABLED: bool = False
+    AI_EMAIL_GENERATION_ENABLED: bool = False
+    AI_REQUEST_TIMEOUT: int = 60
+    AI_MAX_RETRIES: int = 3
 
     class Config:
         env_file = ".env"

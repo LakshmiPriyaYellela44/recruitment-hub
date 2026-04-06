@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -19,6 +19,7 @@ from app.core.exceptions import NotFoundException
 from uuid import UUID
 import logging
 from sqlalchemy import select
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -121,54 +122,55 @@ async def view_candidate_resume(
         )
     
     try:
-        # Verify candidate exists
+        from uuid import UUID
+        # Verify candidate exists and get resume
         service = RecruiterService(db)
-        candidate = await service.get_candidate_profile(current_user.id, candidate_id)
-        if not candidate:
+        candidate_uuid = UUID(candidate_id)
+        candidate_profile = await service.get_candidate_profile(current_user.id, candidate_uuid)
+        if not candidate_profile:
             raise NotFoundException("Candidate", candidate_id)
         
-        # Verify resume belongs to candidate
-        resume = None
-        for r in candidate.resumes:
-            if str(r.id) == resume_id:
-                resume = r
-                break
+        # Verify resume belongs to candidate (from profile response)
+        resume_data = None
+        if candidate_profile.get("resumes"):
+            for r in candidate_profile["resumes"]:
+                if str(r["id"]) == resume_id:
+                    resume_data = r
+                    break
         
-        if not resume:
+        if not resume_data:
             raise NotFoundException("Resume", resume_id)
-        
-        # Get resume file path
-        file_path = resume.file_path  # This is the S3 key or local file path
         
         logger.info(f"Recruiter {current_user.id} viewing resume {resume_id} for candidate {candidate_id}")
         
+        # Download file from S3
+        resume_service = ResumeService(db)
+        file_content = await resume_service.s3_client.download_file(resume_data["s3_key"])
+        
+        if not file_content:
+            logger.error(f"Resume file not found in S3: {resume_data['s3_key']}")
+            raise NotFoundException("Resume file", resume_data["s3_key"])
+        
         # Determine media type based on file extension
-        if resume.file_type.lower() == "pdf":
+        file_type = resume_data["file_type"].lower()
+        if file_type == "pdf":
             media_type = "application/pdf"
-        elif resume.file_type.lower() == "docx":
+        elif file_type == "docx":
             media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         else:
             media_type = "application/octet-stream"
         
-        # Read file
-        try:
-            with open(file_path, "rb") as f:
-                file_content = f.read()
-            
-            # Return with inline disposition for browser display
-            return StreamingResponse(
-                iter([file_content]),
-                media_type=media_type,
-                headers={
-                    "Content-Disposition": f"inline; filename=\"{resume.file_name}\"",
-                    "Content-Type": media_type,
-                    "Content-Length": str(len(file_content)),
-                    "Cache-Control": "no-cache"
-                }
-            )
-        except FileNotFoundError:
-            logger.error(f"Resume file not found at path: {file_path}")
-            raise NotFoundException("Resume file", file_path)
+        # Return with inline disposition for browser display (not download)
+        return Response(
+            content=file_content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"inline; filename=\"{resume_data['file_name']}\"",
+                "Content-Type": media_type,
+                "Content-Length": str(len(file_content)),
+                "Cache-Control": "no-cache"
+            }
+        )
             
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -177,6 +179,126 @@ async def view_candidate_resume(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to view resume"
+        )
+
+
+@router.get("/candidate/{candidate_id}/resume/{resume_id}/download")
+async def download_candidate_resume(
+    candidate_id: str,
+    resume_id: str,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download candidate's resume file (PRO subscription only - downloads as attachment)."""
+    # Check if recruiter
+    if current_user.role.value != UserRole.RECRUITER.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only recruiters can download candidate resumes"
+        )
+    
+    # Check PRO subscription
+    if current_user.subscription_type.value != "PRO":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Resume download is available for PRO subscribers only"
+        )
+    
+    try:
+        # Verify candidate exists and get resume
+        service = RecruiterService(db)
+        candidate_uuid = UUID(candidate_id)
+        candidate_profile = await service.get_candidate_profile(current_user.id, candidate_uuid)
+        if not candidate_profile:
+            raise NotFoundException("Candidate", candidate_id)
+        
+        # Verify resume belongs to candidate (from profile response)
+        resume_data = None
+        if candidate_profile.get("resumes"):
+            for r in candidate_profile["resumes"]:
+                if str(r["id"]) == resume_id:
+                    resume_data = r
+                    break
+        
+        if not resume_data:
+            raise NotFoundException("Resume", resume_id)
+        
+        
+        logger.info(f"Recruiter {current_user.id} downloading resume {resume_id} for candidate {candidate_id}")
+        
+        # Download file from S3
+        resume_service = ResumeService(db)
+        logger.info(f"[download] S3 key: {resume_data['s3_key']}, file_type: {resume_data['file_type']}, file_name: {resume_data['file_name']}")
+        
+        file_content = await resume_service.s3_client.download_file(resume_data["s3_key"])
+        
+        if not file_content:
+            logger.error(f"Resume file not found in S3: {resume_data['s3_key']}")
+            raise NotFoundException("Resume file", resume_data["s3_key"])
+        
+        logger.info(f"[download] Downloaded {len(file_content)} bytes from S3")
+        
+        # Determine media type based on file extension
+        file_type = resume_data["file_type"].lower()
+        
+        # IMPORTANT: Always use application/octet-stream for downloads to prevent browser from trying to open the file
+        # This ensures the file is downloaded, not opened by associated applications
+        media_type = "application/octet-stream"
+        
+        if file_type == "pdf":
+            extension = ".pdf"
+        elif file_type == "docx":
+            extension = ".docx"
+        else:
+            extension = ""
+        
+        logger.info(f"[download] Media type: {media_type}, extension: {extension}")
+        
+        # Construct filename with extension
+        filename = resume_data["file_name"]
+        if not filename.lower().endswith((extension, ".pdf", ".docx")):
+            filename = f"{filename}{extension}"
+        
+        logger.info(f"[download] Final filename: {filename}, content size: {len(file_content)} bytes")
+        
+        # To prevent Adobe Reader and other apps from auto-opening the file,
+        # we serve with .bin extension instead of the original extension
+        # The frontend will rename it back using the original filename from Content-Disposition
+        bin_filename = f"{filename.rsplit('.', 1)[0] if '.' in filename else filename}.bin"
+        
+        # Properly URL-encode the original filename for RFC 5987 compliance
+        encoded_filename = quote(filename, safe='')
+        
+        # Return with attachment disposition for browser download
+        # Using application/octet-stream forces download instead of opening with associated app
+        logger.info(f"[download] Sending: bin_filename={bin_filename}, original_filename={filename}, encoded={encoded_filename}")
+        
+        return Response(
+            content=file_content,
+            media_type=media_type,
+            headers={
+                # Include both the bin filename for download and original in UTF-8 encoding for frontend
+                # ALWAYS send the original filename in the X-Original-Filename header for frontend parsing
+                "Content-Disposition": f"attachment; filename=\"{bin_filename}\"; filename*=UTF-8''{encoded_filename}",
+                "Content-Length": str(len(file_content)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Type": "application/octet-stream",
+                "X-Content-Type-Options": "nosniff",
+                "Pragma": "no-cache",
+                "X-Original-Filename": filename  # Additional header for frontend (priority: use this!)
+            }
+        )
+            
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        logger.error(f"Invalid UUID: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid ID format: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error downloading resume: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to download resume"
         )
 
 

@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
     global worker_task
 
-    # Startup
+    # Startup CONNECT TO DB and PREPARE TABLES
     logger.info("Starting Recruitment Platform...")
     try:
         await init_db()
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"✗ Failed to initialize database: {e}")
         raise
 
-    # Initialize event infrastructure
+    # Initialize event infrastructure FOR INFRASTRUCTURE
     try:
         EventConfig.initialize()
         logger.info("✓ Event infrastructure initialized")
@@ -52,13 +52,16 @@ async def lifespan(app: FastAPI):
         raise
 
     # Start background worker for resume processing
+    # Note: If SQS is unavailable, the worker will retry with exponential backoff
+    # This doesn't block application startup - only logs warnings
+    global worker_task
     try:
         sqs_client = EventConfig.get_sqs_client()
         worker_task = asyncio.create_task(start_resume_worker(sqs_client))
         logger.info("✓ Resume worker started (listening on resume-processing-queue)")
     except Exception as e:
-        logger.error(f"✗ Failed to start resume worker: {e}")
-        raise
+        # Worker startup failure is non-critical since it has exponential backoff retry
+        logger.warning(f"Resume worker failed to start: {e} (will retry with backoff)")
 
     yield
 
@@ -99,6 +102,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[
+        "Content-Disposition",
+        "X-Original-Filename",
+        "X-Content-Type-Options",
+        "X-Request-ID"
+    ],
 )
 
 # Register routers

@@ -14,14 +14,18 @@ export const CandidateProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [downloading, setDownloading] = useState(null);
 
   useEffect(() => {
     const fetchCandidateProfile = async () => {
       try {
         const response = await recruiterService.getCandidateProfile(candidateId);
+        console.log('[CandidateProfilePage] API Response:', response.data);
+        console.log('[CandidateProfilePage] Resumes:', response.data?.resumes);
         setCandidate(response.data);
         setLoading(false);
       } catch (err) {
+        console.error('[CandidateProfilePage] Error:', err);
         setError(err.response?.data?.detail || 'Failed to load candidate profile');
         setLoading(false);
       }
@@ -39,11 +43,17 @@ export const CandidateProfilePage = () => {
     }
   };
 
-  const openResumeInNewTab = (resumeId) => {
-    const token = localStorage.getItem('access_token');
-    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:9000/api';
-    const resumeUrl = `${baseURL}/recruiters/candidate/${candidateId}/resume/${resumeId}?token=${token}`;
-    window.open(resumeUrl, '_blank');
+  const handleDownloadResume = async (resumeId, fileName) => {
+    setDownloading(resumeId);
+    try {
+      await recruiterService.downloadCandidateResume(candidateId, resumeId);
+      console.log(`Resume ${fileName} downloaded successfully`);
+    } catch (err) {
+      console.error('Failed to download resume:', err);
+      alert(`Failed to download resume: ${err.response?.data?.detail || 'Unknown error'}`);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   if (loading) {
@@ -156,31 +166,6 @@ export const CandidateProfilePage = () => {
               ))}
             </div>
           )}
-
-          {/* Resumes */}
-          {candidate.resumes && candidate.resumes.length > 0 && (
-            <div className="section resumes-section">
-              <h2>Resumes</h2>
-              <div className="resumes-list">
-                {candidate.resumes.map((resume) => (
-                  <div key={resume.id} className="resume-item">
-                    <div className="resume-info">
-                      <p className="resume-name">{resume.file_name}</p>
-                      <span className={`status ${resume.status.toLowerCase()}`}>
-                        {resume.status}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => openResumeInNewTab(resume.id)}
-                      className="btn-view-resume"
-                    >
-                      View Resume
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Right column - Email template section */}
@@ -242,6 +227,48 @@ export const CandidateProfilePage = () => {
               </div>
             )}
           </div>
+
+          {/* Resumes */}
+          {candidate.resumes && candidate.resumes.length > 0 && (
+            <div className="section resumes-section">
+              <h2>📄 Resume</h2>
+              <div className="resumes-list">
+                {candidate.resumes.map((resume) => (
+                  <div key={resume.id} className="resume-item">
+                    <div className="resume-info">
+                      <p className="resume-name">{resume.file_name}</p>
+                      <span className={`status ${resume.status.toLowerCase()}`}>
+                        {resume.status}
+                      </span>
+                    </div>
+                    <div className="resume-actions">
+                      <button
+                        onClick={() => !isPro ? null : handleDownloadResume(resume.id, resume.file_name)}
+                        disabled={downloading === resume.id || !isPro}
+                        className={`btn-download-resume ${!isPro ? 'btn-pro-disabled' : ''}`}
+                        title={isPro ? 'Download resume' : 'Download requires PRO subscription'}
+                      >
+                        {downloading === resume.id && isPro ? (
+                          <span className="inline-block animate-spin">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            {!isPro && <span className="pro-badge">PRO</span>}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

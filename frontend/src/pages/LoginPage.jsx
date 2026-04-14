@@ -33,22 +33,23 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f1419] to-[#1a1f26]">
+      <div className="w-full max-w-md px-4">
+        <div className="bg-[#1a1f26] rounded-lg shadow-xl p-8 border border-[#2d333f]">
+          <h1 className="text-3xl font-bold text-center text-white mb-2">
             🎯 Recruitment Platform
           </h1>
+          <p className="text-center text-[#8b95a5] text-sm mb-8">Login to your account</p>
 
           {(error || formError) && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded">
+            <div className="mb-4 p-4 bg-[rgba(196,30,58,0.15)] border border-[rgba(196,30,58,0.3)] text-[#FF6B7A] rounded">
               {error || formError}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
                 Email
               </label>
               <input
@@ -56,13 +57,14 @@ export const LoginPage = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
+                placeholder="you@example.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
                 Password
               </label>
               <input
@@ -70,7 +72,8 @@ export const LoginPage = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
+                placeholder="Enter your password"
                 required
               />
             </div>
@@ -78,15 +81,15 @@ export const LoginPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition"
+              className="w-full py-3 bg-[#C41E3A] hover:bg-[#A91930] disabled:bg-[#2d333f] text-white font-semibold rounded-lg transition duration-200 shadow-md hover:shadow-lg"
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-gray-600">
+          <p className="mt-6 text-center text-sm text-[#8b95a5]">
             Don't have an account?{' '}
-            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/register" className="text-[#C41E3A] hover:text-[#FF6B7A] font-semibold">
               Register
             </Link>
           </p>

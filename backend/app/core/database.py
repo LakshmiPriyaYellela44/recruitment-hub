@@ -14,7 +14,7 @@ if settings.async_database_url and "postgresql" in settings.async_database_url:
     # PostgreSQL-specific settings
     connect_args = {
         "server_settings": {"application_name": settings.APP_NAME},
-        "ssl": "require"  # RDS often needs SSL, "require" is safer than "prefer" here
+        "ssl": "disable"  # Disable SSL for local development (localhost)
     }
 # SQLite doesn't need additional connect_args
 

@@ -102,7 +102,7 @@ export const CandidateDashboard = () => {
                 {profile.skills.map((skill) => (
                   <span
                     key={skill.id}
-                    className="px-4 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+                    className="px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium dark:bg-red-900/30 dark:text-red-400"
                   >
                     {skill.name}
                   </span>

@@ -109,7 +109,7 @@ export const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="admin-dashboard">
-        <div className="loading">Loading...</div>
+        <div className="loading text-center text-[#8b95a5] text-xs sm:text-sm md:text-base">Loading...</div>
       </div>
     );
   }
@@ -117,7 +117,7 @@ export const AdminDashboard = () => {
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
-        <h1>🛠️ Recruiter Management</h1>
+        <h1>Recruiter Management</h1>
         <p>Manage recruiters and their subscription licenses</p>
       </div>
 
@@ -137,7 +137,7 @@ export const AdminDashboard = () => {
         <div className="section-header">
           <h2>Recruiters ({recruiters.length})</h2>
           <button onClick={fetchRecruiters} disabled={loading} className="btn-refresh">
-            🔄 Refresh
+            Refresh
           </button>
         </div>
 
@@ -237,11 +237,11 @@ export const AdminDashboard = () => {
       <div className="info-section">
         <h3>Admin Capabilities</h3>
         <ul>
-          <li>✅ View all recruiters and their subscription status</li>
-          <li>✅ Upgrade recruiters from BASIC to PRO</li>
-          <li>✅ Downgrade recruiters from PRO to BASIC</li>
-          <li>✅ Deactivate/reactivate recruiter accounts</li>
-          <li>✅ Automatic audit logging of all subscription changes</li>
+          <li>View all recruiters and their subscription status</li>
+          <li>Upgrade recruiters from BASIC to PRO</li>
+          <li>Downgrade recruiters from PRO to BASIC</li>
+          <li>Deactivate/reactivate recruiter accounts</li>
+          <li>Automatic audit logging of all subscription changes</li>
         </ul>
       </div>
     </div>

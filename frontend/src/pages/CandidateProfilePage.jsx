@@ -59,7 +59,7 @@ export const CandidateProfilePage = () => {
   if (loading) {
     return (
       <div className="candidate-profile-page">
-        <div className="loading">Loading candidate profile...</div>
+        <div className="loading text-center text-[#8b95a5] text-xs sm:text-sm md:text-base">Loading candidate profile...</div>
       </div>
     );
   }
@@ -126,17 +126,45 @@ export const CandidateProfilePage = () => {
           </div>
 
           {/* Skills */}
-          {candidate.skills && candidate.skills.length > 0 && (
-            <div className="section skills-section">
-              <h2>Skills</h2>
-              <div className="skills-list">
-                {candidate.skills.map((skill) => (
-                  <span key={skill.id} className="skill-tag">
-                    {skill.name}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {candidate.skills && (
+            typeof candidate.skills === 'object' && !Array.isArray(candidate.skills) ? (
+              // Categorized skills (new format)
+              Object.keys(candidate.skills).length > 0 && (
+                <div className="section skills-section">
+                  <h2>Skills</h2>
+                  <div className="skills-by-category">
+                    {Object.entries(candidate.skills).map(([category, skillList]) => 
+                      skillList && skillList.length > 0 && (
+                        <div key={category} className="skill-category">
+                          <h3 className="skill-category-title">{category.replace(/_/g, ' ').toUpperCase()}</h3>
+                          <div className="skills-list">
+                            {skillList.map((skill) => (
+                              <span key={skill.id} className="skill-tag">
+                                {skill.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )
+            ) : (
+              // Flat array (backwards compatibility, old format)
+              candidate.skills.length > 0 && (
+                <div className="section skills-section">
+                  <h2>Skills</h2>
+                  <div className="skills-list">
+                    {candidate.skills.map((skill) => (
+                      <span key={skill.id} className="skill-tag">
+                        {skill.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
+            )
           )}
 
           {/* Experiences */}

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Union, Dict
 from datetime import datetime
 from uuid import UUID
 
@@ -104,7 +104,7 @@ class CandidateProfileResponse(BaseModel):
     role: str
     created_at: datetime
     resumes: List[ResumeResponse] = []
-    skills: List[SkillResponse] = []
+    skills: Union[Dict[str, List[SkillResponse]], List[SkillResponse]] = Field(default_factory=dict)  # Default to empty dict
     experiences: List[ExperienceResponse] = []
     educations: List[EducationResponse] = []
     

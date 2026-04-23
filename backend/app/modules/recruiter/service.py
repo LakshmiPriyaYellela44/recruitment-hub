@@ -78,24 +78,7 @@ class RecruiterService:
         if not candidate:
             raise NotFoundException("Candidate", str(candidate_id))
         
-        # Build response with candidate info and parsed resume data
-        response = {
-            "id": str(candidate.id),
-            "email": candidate.email,  # This contains the email extracted from parsed resume
-            "first_name": candidate.first_name,
-            "last_name": candidate.last_name,
-            "phone_number": getattr(candidate, 'phone_number', None) or "",
-            "role": candidate.role.value if hasattr(candidate, 'role') else "CANDIDATE",
-            "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
-            "member_since": candidate.created_at.strftime("%m/%d/%Y") if candidate.created_at else None,
-            "resumes": [],
-            "experiences": [],
-            "educations": [],
-            "skills": [],
-            "parsed_data": {}
-        }
-        
-        # Get active resume with parsed data
+        # Get active resume with parsed data FIRST (to extract all data from resume)
         from sqlalchemy import select, desc
         from app.core.models import Resume
         
@@ -106,6 +89,53 @@ class RecruiterService:
             .limit(1)
         )
         active_resume = resume_result.scalars().first()
+        
+        # Extract email, name, and phone from parsed_data (PRIORITIZE RESUME DATA)
+        # This is the source of truth for candidate contact info
+        email_from_resume = None
+        name_from_resume = None
+        phone_from_resume = None
+        
+        if active_resume and active_resume.parsed_data:
+            parsed = active_resume.parsed_data
+            email_from_resume = parsed.get('email')
+            phone_from_resume = parsed.get('phone')
+            
+            # Extract name from resume - try 'name' field first
+            resume_name = parsed.get('name')
+            if resume_name:
+                # Parse full name into first and last
+                name_parts = resume_name.strip().split()
+                if len(name_parts) >= 2:
+                    name_from_resume = {
+                        'first': name_parts[0],
+                        'last': ' '.join(name_parts[1:])
+                    }
+                elif len(name_parts) == 1:
+                    name_from_resume = {
+                        'first': name_parts[0],
+                        'last': ''
+                    }
+        
+        # Build response with RESUME DATA as PRIMARY source of truth
+        response = {
+            "id": str(candidate.id),
+            # PRIORITIZE: Use email from resume, fallback to user email
+            "email": (email_from_resume or candidate.email),
+            # PRIORITIZE: Use name from resume, fallback to user name
+            "first_name": (name_from_resume['first'] if name_from_resume else candidate.first_name) or "",
+            "last_name": (name_from_resume['last'] if name_from_resume else candidate.last_name) or "",
+            # PRIORITIZE: Use phone from resume, fallback to user phone
+            "phone_number": (phone_from_resume or getattr(candidate, 'phone_number', None) or ""),
+            "role": candidate.role.value if hasattr(candidate, 'role') else "CANDIDATE",
+            "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
+            "member_since": candidate.created_at.strftime("%m/%d/%Y") if candidate.created_at else None,
+            "resumes": [],
+            "experiences": [],
+            "educations": [],
+            "skills": [],
+            "parsed_data": {}
+        }
         
         # Only include the latest resume (not all resumes)
         if active_resume:
@@ -127,13 +157,27 @@ class RecruiterService:
             
             # Extract structured data from parsed resume
             if parsed.get('skills'):
-                response["skills"] = [
-                    {
-                        "name": skill if isinstance(skill, str) else skill.get('name', skill),
-                        "proficiency": skill.get('proficiency', 'INTERMEDIATE') if isinstance(skill, dict) else 'INTERMEDIATE'
-                    }
-                    for skill in parsed.get('skills', [])[:20]
-                ]
+                skills_data = parsed.get('skills', {})
+                
+                if isinstance(skills_data, dict):
+                    # New format: categorized skills {backend: [...], cloud_devops: [...], etc}
+                    for category, category_skills in skills_data.items():
+                        if isinstance(category_skills, list):
+                            for skill in category_skills[:20]:  # Limit to 20 total
+                                response["skills"].append({
+                                    "name": skill if isinstance(skill, str) else skill.get('name', skill),
+                                    "proficiency": 'INTERMEDIATE',
+                                    "category": category
+                                })
+                elif isinstance(skills_data, list):
+                    # Old format: flat array of skills
+                    response["skills"] = [
+                        {
+                            "name": skill if isinstance(skill, str) else skill.get('name', skill),
+                            "proficiency": skill.get('proficiency', 'INTERMEDIATE') if isinstance(skill, dict) else 'INTERMEDIATE'
+                        }
+                        for skill in skills_data[:20]
+                    ]
             
             if parsed.get('experiences'):
                 response["experiences"] = [

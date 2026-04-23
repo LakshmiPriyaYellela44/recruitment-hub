@@ -39,28 +39,28 @@ export const CandidateProfileView = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
+      <div className="flex items-center justify-center h-screen bg-[#0f1419]">
         <div className="text-center">
-          <p className="text-red-600 text-lg">{error}</p>
+          <p className="text-[#C41E3A] text-lg">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen bg-gradient-to-b from-[#0f1419] to-[#1a1f26] p-8">
       <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-[#1a1f26] border border-[#2d333f] rounded-lg shadow-lg p-8">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              <h1 className="text-3xl font-bold text-[#f5f7fa] mb-2">
                 {candidate.first_name} {candidate.last_name}
               </h1>
-              <p className="text-gray-600 text-lg">{candidate.email}</p>
+              <p className="text-[#8b95a5] text-lg">{candidate.email}</p>
             </div>
             <button
               onClick={() => window.close()}
-              className="text-3xl text-gray-400 hover:text-gray-600"
+              className="text-3xl text-[#6b7684] hover:text-[#8b95a5]"
             >
               ✕
             </button>
@@ -70,14 +70,16 @@ export const CandidateProfileView = () => {
             {user?.subscription_type === 'PRO' ? (
               <button
                 onClick={() => setShowEmailForm(true)}
-                className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded text-lg"
+                style={{ backgroundColor: '#C41E3A' }}
+                className="px-6 py-3 hover:opacity-90 text-white font-medium rounded text-lg"
               >
-                📧 Send Email
+                Send Email
               </button>
             ) : (
               <button
                 onClick={() => window.open('/dashboard', '_self')}
-                className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium rounded text-lg"
+                style={{ backgroundColor: '#C41E3A' }}
+                className="px-6 py-3 hover:opacity-90 text-white font-medium rounded text-lg"
               >
                 🚀 Upgrade to Send Email
               </button>
@@ -92,9 +94,9 @@ export const CandidateProfileView = () => {
               
               if (!parsedEmail) {
                 return (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-700 font-semibold">
-                      ⚠️ No email found for this candidate. Please ensure candidate has a valid email.
+                  <div className="mb-6 p-4 bg-[rgba(196,30,58,0.15)] border border-[#C41E3A] rounded-lg">
+                    <p className="text-[#C41E3A] font-semibold">
+                      No email found for this candidate. Please ensure candidate has a valid email.
                     </p>
                   </div>
                 );
@@ -121,32 +123,60 @@ export const CandidateProfileView = () => {
 
           <div className="space-y-8">
             <section>
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Skills</h3>
-              {candidate.skills?.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {candidate.skills.map((skill, idx) => (
-                    <span
-                      key={idx}
-                      className="px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-medium"
-                    >
-                      {skill.name || skill}
-                    </span>
-                  ))}
-                </div>
+              <h3 className="text-2xl font-bold text-[#f5f7fa] mb-4">Skills</h3>
+              {candidate.skills ? (
+                typeof candidate.skills === 'object' && !Array.isArray(candidate.skills) ? (
+                  // Categorized skills
+                  <div className="space-y-6">
+                    {Object.entries(candidate.skills).map(([category, skillList]) => 
+                      skillList && skillList.length > 0 && (
+                        <div key={category}>
+                          <h4 className="text-lg font-semibold text-[#f5f7fa] mb-2 capitalize">
+                            {category.replace(/_/g, ' ')}
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {skillList.map((skill, idx) => (
+                              <span
+                                key={idx}
+                                style={{ backgroundColor: '#C41E3A' }}
+                                className="px-4 py-2 hover:opacity-90 text-white rounded-full font-medium transition-colors"
+                              >
+                                {skill.name || skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  // Flat skills array (backwards compatibility)
+                  <div className="flex flex-wrap gap-2">
+                    {candidate.skills.map((skill, idx) => (
+                      <span
+                        key={idx}
+                        style={{ backgroundColor: '#C41E3A' }}
+                        className="px-4 py-2 hover:opacity-90 text-white rounded-full font-medium transition-colors"
+                      >
+                        {skill.name || skill}
+                      </span>
+                    ))}
+                  </div>
+                )
               ) : (
-                <p className="text-gray-500">No skills listed</p>
+                <p className="text-[#8b95a5]">No skills listed</p>
               )}
             </section>
 
             {candidate.experiences && candidate.experiences.length > 0 && (
               <section>
-                <h3 className="text-2xl font-bold text-gray-800 mb-4">Experience</h3>
+                <h3 className="text-2xl font-bold text-[#f5f7fa] mb-4">Experience</h3>
                 <div className="space-y-5">
                   {candidate.experiences.map((exp) => (
-                    <div key={exp.id} className="border-l-4 border-blue-500 pl-6 py-2">
-                      <p className="text-xl font-semibold text-gray-800">{exp.job_title}</p>
-                      <p className="text-lg text-gray-600">{exp.company_name}</p>
-                      {exp.years && <p className="text-gray-500 mt-1">{exp.years} years experience</p>}
+                    <div key={exp.id} className="border-l-4 border-[#C41E3A] pl-6 py-2">
+                      <p className="text-xl font-semibold text-[#f5f7fa]">{exp.job_title}</p>
+                      <p className="text-lg text-[#8b95a5]">{exp.company_name}</p>
+                      {exp.years && <p className="text-[#6b7684] mt-1">{exp.years} years experience</p>}
                     </div>
                   ))}
                 </div>
@@ -155,14 +185,14 @@ export const CandidateProfileView = () => {
 
             {candidate.educations && candidate.educations.length > 0 && (
               <section>
-                <h3 className="text-2xl font-bold text-gray-800 mb-4">Education</h3>
+                <h3 className="text-2xl font-bold text-[#f5f7fa] mb-4">Education</h3>
                 <div className="space-y-5">
                   {candidate.educations.map((edu) => (
-                    <div key={edu.id} className="border-l-4 border-green-500 pl-6 py-2">
-                      <p className="text-xl font-semibold text-gray-800">{edu.degree}</p>
-                      <p className="text-lg text-gray-600">{edu.institution}</p>
+                    <div key={edu.id} className="border-l-4 border-[#C41E3A] pl-6 py-2">>
+                      <p className="text-xl font-semibold text-[#f5f7fa]">{edu.degree}</p>
+                      <p className="text-lg text-[#8b95a5]">{edu.institution}</p>
                       {edu.field_of_study && (
-                        <p className="text-gray-500 mt-1">{edu.field_of_study}</p>
+                        <p className="text-[#6b7684] mt-1">{edu.field_of_study}</p>
                       )}
                     </div>
                   ))}

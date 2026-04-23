@@ -91,15 +91,26 @@ class CandidateService:
     async def add_skill_to_candidate(self, user_id: UUID, skill_name: str, proficiency: Optional[str] = None, resume_id: Optional[UUID] = None, is_derived: bool = False, auto_commit: bool = True):
         """Add skill to candidate."""
         try:
-            # Get or create skill using async query
-            result = await self.db.execute(select(Skill).filter(Skill.name.ilike(skill_name.lower())))
+            # Sanitize skill name - preserve original casing but remove whitespace
+            skill_name_clean = skill_name.strip() if isinstance(skill_name, str) else str(skill_name)
+            skill_name_lower = skill_name_clean.lower()
+            
+            logger.debug(f"[add_skill] Adding skill: original='{skill_name}', cleaned='{skill_name_clean}'")
+            
+            # Get or create skill using case-insensitive search
+            result = await self.db.execute(select(Skill).filter(Skill.name.ilike(skill_name_lower)))
             skill = result.scalars().first()
             
             if not skill:
-                skill = Skill(name=skill_name.lower())
+                logger.debug(f"[add_skill] Skill '{skill_name_lower}' not found, creating with name='{skill_name_clean}'")
+                # Store with original casing for better display
+                skill = Skill(name=skill_name_clean)
                 self.db.add(skill)
-                await self.db.flush()  # ALWAYS flush to get ID, regardless of auto_commit
+                await self.db.flush()  # ALWAYS flush to get ID
                 await self.db.refresh(skill)
+                logger.debug(f"[add_skill] Created skill: id={skill.id}, name='{skill.name}'")
+            else:
+                logger.debug(f"[add_skill] Found existing skill: id={skill.id}, name='{skill.name}'")
             
             # Create candidate skill relationship
             from app.core.models import CandidateSkill
@@ -111,16 +122,18 @@ class CandidateService:
                 is_derived_from_resume=is_derived
             )
             self.db.add(candidate_skill)
-            await self.db.flush()  # ALWAYS flush to register in session, regardless of auto_commit
+            await self.db.flush()  # ALWAYS flush to register in session
+            logger.debug(f"[add_skill] Created candidate_skill relationship")
             
             if auto_commit:
-                await self.db.commit()  # Only COMMIT if auto_commit=True
+                await self.db.commit()
                 await self.db.refresh(candidate_skill)
+                logger.debug(f"[add_skill] Committed changes")
             
-            logger.info(f"[add_skill] Added skill '{skill_name}' to candidate {user_id}")
+            logger.info(f"[add_skill] ✓ Added skill '{skill_name_clean}' to candidate {user_id}")
             return candidate_skill
         except Exception as e:
-            logger.error(f"[add_skill] Error adding skill '{skill_name}': {str(e)}", exc_info=True)
+            logger.error(f"[add_skill] ❌ Error adding skill '{skill_name}' to candidate {user_id}: {str(e)}", exc_info=True)
             raise
     
     async def remove_skill_from_candidate(self, user_id: UUID, skill_id: UUID):
@@ -192,8 +205,23 @@ class CandidateService:
         educations_added = 0
         
         try:
-            # Extract and add skills
-            skills_list = parsed_data.get("skills", [])
+            # Extract and add skills (handle both flat array and categorized object)
+            skills_data = parsed_data.get("skills", [])
+            skills_list = []
+            
+            if isinstance(skills_data, dict):
+                # New format: categorized skills {backend: [...], cloud_devops: [...], etc}
+                logger.info(f"[sync_parsed_resume_data] Processing categorized skills")
+                for category, category_skills in skills_data.items():
+                    if isinstance(category_skills, list) and category != "other":
+                        skills_list.extend(category_skills)
+                    elif category == "other" and isinstance(category_skills, list):
+                        skills_list.extend(category_skills)
+            elif isinstance(skills_data, list):
+                # Old format: flat array of skills
+                logger.info(f"[sync_parsed_resume_data] Processing flat skills array")
+                skills_list = skills_data
+            
             if skills_list:
                 logger.info(f"[sync_parsed_resume_data] Adding {len(skills_list)} skills: {skills_list}")
                 for skill_name in skills_list:
@@ -276,14 +304,46 @@ class CandidateService:
     
     # ============ EXPLICIT PERSISTENCE METHODS ============
     
-    async def _persist_skills(self, user_id: UUID, skills: list, resume_id: Optional[UUID] = None, auto_commit: bool = True) -> int:
-        """Persist skills extracted from resume. Returns count of skills added."""
-        logger.info(f"[_persist_skills] Persisting {len(skills)} skills for user_id={user_id}, resume_id={resume_id}")
+    async def _persist_skills(self, user_id: UUID, skills, resume_id: Optional[UUID] = None, auto_commit: bool = True) -> int:
+        """
+        Persist skills extracted from resume. Handles both flat list and categorized dict formats.
+        Returns count of skills added.
+        """
+        logger.info(f"[_persist_skills] Persisting skills for user_id={user_id}, resume_id={resume_id}")
+        
+        # Flatten skills if they're categorized (dict format from Gemini/Fallback)
+        skills_to_persist = []
+        if isinstance(skills, dict):
+            # Categorized format: {backend: [...], frontend: [...], ...}
+            logger.info(f"[_persist_skills] Processing categorized skills dictionary with {len(skills)} categories")
+            for category, category_skills in skills.items():
+                if isinstance(category_skills, list) and len(category_skills) > 0:
+                    skills_to_persist.extend(category_skills)
+                    logger.info(f"[_persist_skills]   Category '{category}': {len(category_skills)} skills - {category_skills}")
+        elif isinstance(skills, list):
+            # Flat list format
+            logger.info(f"[_persist_skills] Processing flat skills list")
+            skills_to_persist = skills
+        
+        logger.info(f"[_persist_skills] Total skills to persist: {len(skills_to_persist)}")
+        
+        if not skills_to_persist:
+            logger.warning(f"[_persist_skills] No skills to persist!")
+            return 0
         
         count = 0
+        failed_skills = []
         try:
-            for skill_name in skills:
+            for i, skill_name in enumerate(skills_to_persist, 1):
                 try:
+                    # Ensure skill_name is a string and not empty
+                    if not isinstance(skill_name, str) or not skill_name.strip():
+                        logger.warning(f"[_persist_skills] Skipping invalid skill name: {repr(skill_name)}")
+                        continue
+                    
+                    skill_name = skill_name.strip()
+                    logger.debug(f"[_persist_skills] Persisting skill {i}/{len(skills_to_persist)}: '{skill_name}'")
+                    
                     await self.add_skill_to_candidate(
                         user_id,
                         skill_name,
@@ -293,22 +353,28 @@ class CandidateService:
                         auto_commit=False
                     )
                     count += 1
-                    logger.info(f"[_persist_skills] ✓ Persisted skill: {skill_name}")
+                    logger.info(f"[_persist_skills]   ✓ Skill {i}: {skill_name}")
                 except Exception as e:
-                    logger.error(f"[_persist_skills] Failed to persist skill '{skill_name}': {str(e)}")
+                    logger.error(f"[_persist_skills]   ❌ Skill {i}: Failed to persist '{skill_name}': {str(e)}", exc_info=True)
+                    failed_skills.append((skill_name, str(e)))
+            
+            logger.info(f"[_persist_skills] Processed {len(skills_to_persist)} skills: {count} succeeded, {len(failed_skills)} failed")
+            if failed_skills:
+                logger.warning(f"[_persist_skills] Failed skills: {failed_skills}")
             
             if auto_commit:
                 await self.db.commit()
-                logger.info(f"[_persist_skills] ✓ Committed {count} skills")
+                logger.info(f"[_persist_skills] ✅ Committed {count} skills to database")
             else:
                 await self.db.flush()
-                logger.info(f"[_persist_skills] ✓ Flushed {count} skills")
+                logger.info(f"[_persist_skills] ✅ Flushed {count} skills to session")
             
             return count
         except Exception as e:
-            logger.error(f"[_persist_skills] Error persisting skills: {str(e)}", exc_info=True)
+            logger.error(f"[_persist_skills] CRITICAL ERROR persisting skills: {str(e)}", exc_info=True)
             if auto_commit:
                 await self.db.rollback()
+                logger.error(f"[_persist_skills] Transaction rolled back")
             raise
     
     

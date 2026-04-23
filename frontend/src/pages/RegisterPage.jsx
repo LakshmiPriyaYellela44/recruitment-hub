@@ -36,24 +36,56 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f1419] to-[#1a1f26]">
-      <div className="w-full max-w-md px-4">
-        <div className="bg-[#1a1f26] rounded-lg shadow-xl p-8 border border-[#2d333f]">
-          <h1 className="text-3xl font-bold text-center text-white mb-2">
-            Create Account
-          </h1>
-          <p className="text-center text-[#8b95a5] text-sm mb-8">Join our recruitment platform</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f1419] via-[#1a1f26] to-[#0f1419] px-3 sm:px-4">
+      <div className="w-full max-w-md px-2 sm:px-4">
+        {/* Card Container */}
+        <div className="bg-[#1a1f26] rounded-lg sm:rounded-xl shadow-lg p-6 sm:p-8 border border-[#2d333f]">
+          {/* Professional Brand Header */}
+          <div className="flex items-center justify-center gap-3 sm:gap-4 mb-8 sm:mb-10">
+            {/* Logo Image */}
+            <div className="flex-shrink-0">
+              <img 
+                src="/images/logo.jpg" 
+                alt="Tricon Infotech Logo" 
+                className="w-12 sm:w-16 h-12 sm:h-16 rounded-lg object-cover shadow-md"
+              />
+            </div>
+            
+            {/* Brand Text */}
+            <div className="flex flex-col justify-center flex-grow">
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#f5f7fa] leading-tight">
+                Tricon Infotech
+              </h2>
+              <p style={{ color: '#C41E3A' }} className="text-xs sm:text-sm font-semibold mt-0.5 uppercase tracking-wider">
+                Buddy Recruitment
+              </p>
+            </div>
+          </div>
 
+          {/* Divider */}
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-[#2d333f] to-transparent mb-6 sm:mb-8"></div>
+
+          {/* Heading */}
+          <h1 className="text-xl sm:text-2xl font-bold text-center text-[#f5f7fa] mb-2">
+            Join Buddy
+          </h1>
+          <p className="text-center text-[#8b95a5] text-xs sm:text-sm mb-6 sm:mb-8">
+            Create your account to get started
+          </p>
+
+          {/* Error Alert */}
           {(error || formError) && (
-            <div className="mb-4 p-4 bg-[rgba(196,30,58,0.15)] border border-[rgba(196,30,58,0.3)] text-[#FF6B7A] rounded">
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-[#3a0a0a] border border-[#5a1a1a] text-[#ff8a94] rounded-lg text-xs sm:text-sm font-medium">
               {error || formError}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          {/* Registration Form */}
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+            {/* Name Fields */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <div>
-                <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
+                <label className="block text-xs sm:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
                   First Name
                 </label>
                 <input
@@ -61,12 +93,13 @@ export const RegisterPage = () => {
                   name="first_name"
                   value={formData.first_name}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] bg-[#0f1419] text-[#f5f7fa] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#8B2635] focus:ring-4 focus:ring-[#5C1520] transition text-sm caret-[#8B2635]"
                   placeholder="John"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
+                <label className="block text-xs sm:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
                   Last Name
                 </label>
                 <input
@@ -74,29 +107,32 @@ export const RegisterPage = () => {
                   name="last_name"
                   value={formData.last_name}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] bg-[#0f1419] text-[#f5f7fa] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-buddy-red focus:ring-4 focus:ring-[#5a0a17] transition text-sm caret-buddy-red"
                   placeholder="Doe"
+                  required
                 />
               </div>
             </div>
 
+            {/* Email Field */}
             <div>
-              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
-                Email
+              <label className="block text-xs sm:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
+                Email Address
               </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-                placeholder="you@example.com"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] bg-[#0f1419] text-[#f5f7fa] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#C41E3A] focus:ring-4 focus:ring-[#5a0a17] transition text-sm caret-[#C41E3A]"
+                placeholder="e-mail@gmail.com"
                 required
               />
             </div>
 
+            {/* Password Field */}
             <div>
-              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
+              <label className="block text-xs sm:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
                 Password
               </label>
               <input
@@ -104,44 +140,65 @@ export const RegisterPage = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-                placeholder="Enter a strong password"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] bg-[#0f1419] text-[#f5f7fa] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#C41E3A] focus:ring-4 focus:ring-[#5a0a17] transition text-sm caret-[#C41E3A]"
+                placeholder="Enter your password"
                 required
               />
             </div>
 
+            {/* Role Select */}
             <div>
-              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2">
+              <label className="block text-xs sm:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
                 I am a
               </label>
               <select
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] text-[#f5f7fa] rounded-lg focus:outline-none focus:border-[#C41E3A] focus:ring-4 focus:ring-[#5a0a17] transition bg-[#0f1419] text-sm"
+                required
               >
-                <option value="CANDIDATE" className="bg-[#1a1f26]">Job Candidate</option>
-                <option value="RECRUITER" className="bg-[#1a1f26]">Recruiter</option>
-                <option value="ADMIN" className="bg-[#1a1f26]">Admin</option>
+                <option value="CANDIDATE">Job Candidate</option>
+                <option value="RECRUITER">Recruiter</option>
+                <option value="ADMIN">Administrator</option>
               </select>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#C41E3A] hover:bg-[#A91930] disabled:bg-[#2d333f] text-white font-semibold rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+              style={{ backgroundColor: '#C41E3A' }}
+              className="w-full py-2 sm:py-3 hover:opacity-90 disabled:bg-[#3d4551] text-white font-semibold rounded-lg transition-all duration-200 transform hover:shadow-lg active:scale-95 disabled:cursor-not-allowed mt-4 sm:mt-6 text-sm sm:text-base"
             >
-              {loading ? 'Creating account...' : 'Register'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-block w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Creating account...
+                </span>
+              ) : (
+                'Create Account'
+              )}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-[#8b95a5]">
+          {/* Login Link */}
+          <p className="mt-4 sm:mt-8 text-center text-xs sm:text-sm text-[#8b95a5]">
             Already have an account?{' '}
-            <Link to="/login" className="text-[#C41E3A] hover:text-[#FF6B7A] font-semibold">
-              Login
+            <Link 
+              to="/login" 
+              style={{ color: '#C41E3A' }}
+              className="hover:opacity-80 font-semibold transition hover:underline"
+            >
+              Sign In
             </Link>
           </p>
         </div>
+
+        {/* Footer Text */}
+        <p className="text-center text-xs text-[#6d7a88] mt-4 sm:mt-6">
+          © 2024 Buddy Recruitment Program. All rights reserved.
+        </p>
       </div>
     </div>
   );

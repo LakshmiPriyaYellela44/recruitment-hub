@@ -213,13 +213,19 @@ class ResumeService:
                 
                 # Persist skills
                 skills_list = parsed_data.get("skills", [])
+                logger.info(f"[process_resume] Skills from parsed_data: type={type(skills_list)}, content={skills_list if isinstance(skills_list, list) else f'dict with {len(skills_list)} categories'}")
+                
                 if skills_list:
+                    logger.info(f"[process_resume] Calling _persist_skills with {len(list(skills_list.keys()) if isinstance(skills_list, dict) else skills_list)} items")
                     skills_count = await candidate_service._persist_skills(
                         resume.user_id,
                         skills_list,
                         resume_id=resume_id,
                         auto_commit=False
                     )
+                    logger.info(f"[process_resume] _persist_skills returned: {skills_count} skills persisted")
+                else:
+                    logger.warning(f"[process_resume] No skills found in parsed_data!")
                 
                 # Persist experiences
                 experiences_list = parsed_data.get("experiences", [])
@@ -246,13 +252,15 @@ class ResumeService:
                 logger.error(f"[process_resume] Failed to persist parsed data: {str(e)}", exc_info=True)
                 raise
             
-            # 6. Update candidate email if extracted (only if email doesn't belong to another user)
-            email = parsed_data.get("email")
-            if email:
-                from sqlalchemy import select
-                user_result = await self.db.execute(select(User).filter(User.id == resume.user_id))
-                user = user_result.scalars().first()
-                if user:
+            # 6. Update candidate email and phone if extracted
+            from sqlalchemy import select
+            user_result = await self.db.execute(select(User).filter(User.id == resume.user_id))
+            user = user_result.scalars().first()
+            
+            if user:
+                # Update email if extracted (only if email doesn't belong to another user)
+                email = parsed_data.get("email")
+                if email:
                     old_email = user.email
                     # Only update email if it's different and doesn't belong to another user
                     if email != old_email:
@@ -266,6 +274,18 @@ class ResumeService:
                             logger.info(f"[process_resume] ✓ Updated email for user_id={resume.user_id}: {old_email} → {email}")
                         else:
                             logger.warning(f"[process_resume]  Email {email} already in use, skipping email update")
+                
+                # Update phone if extracted
+                phone = parsed_data.get("phone")
+                if phone:
+                    old_phone = user.phone_number
+                    # Only update phone if it's different and not empty
+                    if phone != old_phone and phone.strip():
+                        user.phone_number = phone
+                        await self.db.flush()
+                        logger.info(f"[process_resume] ✓ Updated phone for user_id={resume.user_id}: {old_phone} → {phone}")
+                    elif not phone.strip():
+                        logger.warning(f"[process_resume]  Phone number is empty string, skipping phone update")
             
             # 7. Mark as PARSED
             resume.parsed_data = parsed_data

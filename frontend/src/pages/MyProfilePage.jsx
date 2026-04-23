@@ -73,7 +73,19 @@ export const MyProfilePage = () => {
     );
   }
 
-  const skillCount = profile?.skills?.length || 0;
+  // Calculate skill count correctly for both categorized (object) and flat (array) formats
+  const skillCount = profile?.skills
+    ? typeof profile.skills === 'object' && !Array.isArray(profile.skills)
+      ? Object.values(profile.skills).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)
+      : (Array.isArray(profile.skills) ? profile.skills.length : 0)
+    : 0;
+  
+  // DEBUG: Log skills data
+  console.log('DEBUG: profile.skills =', profile?.skills);
+  console.log('DEBUG: skillCount =', skillCount);
+  console.log('DEBUG: typeof profile.skills =', typeof profile?.skills);
+  console.log('DEBUG: Is array?', Array.isArray(profile?.skills));
+  console.log('DEBUG: full profile =', profile);
   const experienceCount = profile?.experiences?.length || 0;
   const educationCount = profile?.educations?.length || 0;
   const resumeCount = profile?.resumes?.length || 0;
@@ -227,21 +239,54 @@ export const MyProfilePage = () => {
             <div className="card">
               <h2>Your Skills</h2>
               {skillCount > 0 ? (
-                <div className="skills-container">
-                  <div className="skills-info">
-                    <p className="info-text">
-                      ✨ {skillCount} skills identified from your resumes
-                    </p>
-                  </div>
-                  <div className="skills-grid">
-                    {profile.skills.map((skill) => (
-                      <div key={skill.id} className="skill-badge">
-                        <span className="skill-name">{skill.name}</span>
-                        {skill.category && <span className="skill-category">{skill.category}</span>}
+                typeof profile.skills === 'object' && !Array.isArray(profile.skills) ? (
+                  // Categorized skills
+                  <div className="skills-container">
+                    <div className="skills-info">
+                      <p className="info-text">
+                        ✨ {skillCount} skills identified from your resumes (organized by category)
+                      </p>
+                      <div className="category-legend">
+                        {Object.keys(profile.skills).filter(cat => profile.skills[cat]?.length > 0).map(cat => (
+                          <span key={cat} className="legend-item">{cat.replace(/_/g, ' ')}: {profile.skills[cat].length}</span>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                    <div className="skills-by-category">
+                      {Object.entries(profile.skills).map(([category, skillList]) => 
+                        skillList && skillList.length > 0 && (
+                          <div key={category} className="category-section">
+                            <h3 className="category-title">{category.replace(/_/g, ' ')}</h3>
+                            <div className="skills-grid">
+                              {skillList.map((skill, idx) => (
+                                <div key={idx} className="skill-badge">
+                                  <span className="skill-name">{skill.name || skill}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Flat skills (backwards compatibility)
+                  <div className="skills-container">
+                    <div className="skills-info">
+                      <p className="info-text">
+                        ✨ {skillCount} skills identified from your resumes
+                      </p>
+                    </div>
+                    <div className="skills-grid">
+                      {profile.skills.map((skill) => (
+                        <div key={skill.id} className="skill-badge">
+                          <span className="skill-name">{skill.name}</span>
+                          {skill.category && <span className="skill-category">{skill.category}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
               ) : (
                 <div className="empty-state">
                   <p>No skills identified yet. Upload a resume to extract skills automatically.</p>

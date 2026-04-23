@@ -71,170 +71,222 @@ export const RecruiterDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0f1419] to-[#1a1f26]">
+    <div className="min-h-screen bg-gradient-to-b from-[#0f1419] via-[#1a1f26] to-[#0f1419]">
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
         {/* Header Section */}
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-12 flex justify-between items-start">
           <div className="flex-1">
-            <p className="text-xs md:text-sm font-semibold text-[#C41E3A] uppercase tracking-widest mb-2">Find Top Talent</p>
-            <h1 className="text-2xl md:text-3xl font-semibold text-white mb-2 tracking-tight">Discover Talented Professionals</h1>
-            <p className="text-xs md:text-sm text-gray-400 font-normal">Search by skills, experience, and education</p>
+            <p className="text-xs md:text-sm font-bold text-[#8B2635] uppercase tracking-widest mb-3">Discovery</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#f5f7fa] mb-3 tracking-tight">
+              Find Top Talent
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-[#8b95a5] font-normal max-w-2xl">
+              Search our database of qualified professionals by skills, experience, and education
+            </p>
             {user?.subscription_type === 'BASIC' && (
-              <p className="text-xs text-orange-500 mt-3 block">⚠️ Limited features - Upgrade to PRO for full access</p>
+              <p className="text-sm text-[#f59e0b] mt-4 font-semibold bg-[#fffbeb] px-4 py-2 rounded-lg w-fit border border-[#fcd34d]">
+                ⚡ Limited features - Upgrade to PRO for advanced search
+              </p>
             )}
             {user?.subscription_type === 'PRO' && (
-              <p className="text-xs text-[#10B981] mt-3 block">✨ PRO Plan - Full access unlocked</p>
+              <p className="text-sm text-[#10b981] mt-4 font-semibold bg-[#ecfdf5] px-4 py-2 rounded-lg w-fit border border-[#d1fae5]">
+                ✓ PRO Plan active - Full search capabilities unlocked
+              </p>
             )}
           </div>
-          <div className="flex flex-col gap-2 text-right pl-4">
+          <div className="flex flex-col gap-2 text-right pl-8 hidden md:block">
+            <p className="text-xs text-[#8b95a5] font-medium">Current Subscription</p>
+            <p className="text-2xl font-bold text-[#8B2635]">{user?.subscription_type}</p>
+          </div>
+        </div>
+
+        {/* Search Form Card */}
+        <div className="bg-[#1a1f26] border border-[#2d333f] rounded-xl shadow-sm p-4 sm:p-6 md:p-8 mb-8">
+          <h2 className="text-base sm:text-lg font-semibold text-[#f5f7fa] mb-4 sm:mb-6">Search Filters</h2>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
+            {/* Keywords Input */}
             <div>
-              <p className="text-xs text-gray-500 mb-1">Current Plan</p>
-              <p className="text-lg font-bold text-white">{user?.subscription_type}</p>
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
+                Keywords
+              </label>
+              <input
+                type="text"
+                name="keyword"
+                value={searchParams.keyword}
+                onChange={(e) => setSearchParams((prev) => ({ ...prev, keyword: e.target.value }))}
+                onKeyPress={handleSearch}
+                placeholder="Name, email..."
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] text-[#0f1419] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#8B2635] focus:ring-4 focus:ring-[#5C1520] transition text-sm"
+              />
+            </div>
+
+            {/* Skills Input */}
+            <div>
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
+                Skills
+              </label>
+              <input
+                type="text"
+                name="skills"
+                value={searchParams.skills}
+                onChange={(e) => setSearchParams((prev) => ({ ...prev, skills: e.target.value }))}
+                onKeyPress={handleSearch}
+                placeholder="Python, React..."
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] text-[#0f1419] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#8B2635] focus:ring-4 focus:ring-[#5C1520] transition text-sm"
+              />
+            </div>
+
+            {/* Experience Input */}
+            <div>
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
+                Experience
+              </label>
+              <input
+                type="text"
+                name="experience"
+                value={searchParams.experience}
+                onChange={(e) => setSearchParams((prev) => ({ ...prev, experience: e.target.value }))}
+                onKeyPress={handleSearch}
+                placeholder="Job title..."
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] text-[#0f1419] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#8B2635] focus:ring-4 focus:ring-[#5C1520] transition text-sm"
+              />
+            </div>
+
+            {/* Education Input */}
+            <div>
+              <label className="block text-sm font-semibold text-[#f5f7fa] mb-2 uppercase tracking-wide">
+                Education
+              </label>
+              <input
+                type="text"
+                name="education"
+                value={searchParams.education}
+                onChange={(e) => setSearchParams((prev) => ({ ...prev, education: e.target.value }))}
+                onKeyPress={handleSearch}
+                placeholder="Degree..."
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-[#2d333f] text-[#0f1419] placeholder-[#6d7a88] rounded-lg focus:outline-none focus:border-[#8B2635] focus:ring-4 focus:ring-[#5C1520] transition text-sm"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col justify-end gap-2 sm:gap-3">
+              <button
+                onClick={handleSearch}
+                style={{ backgroundColor: '#C41E3A' }}
+                className="px-4 sm:px-6 py-2 sm:py-3 hover:opacity-90 text-white rounded-lg font-semibold transition-all duration-200 transform hover:shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                Search
+              </button>
+              {hasSearched && (
+                <button
+                  onClick={handleClearSearch}
+                  className="px-4 sm:px-6 py-1.5 sm:py-2 bg-[#2d333f] hover:bg-[#3d4551] text-[#f5f7fa] rounded-lg font-medium transition text-xs sm:text-sm"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
-      </div>
-
-      <div className="bg-[#1a1f26] border border-[#2d333f] rounded-lg shadow p-6 md:p-8 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-xs md:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase">Keywords</label>
-            <input
-              type="text"
-              name="keyword"
-              value={searchParams.keyword}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, keyword: e.target.value }))}
-              onKeyPress={handleSearch}
-              placeholder="Name, email..."
-              className="w-full px-3 md:px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase">Skills</label>
-            <input
-              type="text"
-              name="skills"
-              value={searchParams.skills}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, skills: e.target.value }))}
-              onKeyPress={handleSearch}
-              placeholder="Python, React..."
-              className="w-full px-3 md:px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase">Experience</label>
-            <input
-              type="text"
-              name="experience"
-              value={searchParams.experience}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, experience: e.target.value }))}
-              onKeyPress={handleSearch}
-              placeholder="Job title, company..."
-              className="w-full px-3 md:px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm font-semibold text-[#f5f7fa] mb-2 uppercase">Education</label>
-            <input
-              type="text"
-              name="education"
-              value={searchParams.education}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, education: e.target.value }))}
-              onKeyPress={handleSearch}
-              placeholder="Degree, institution..."
-              className="w-full px-3 md:px-4 py-3 bg-[#0f1419] border border-[#2d333f] text-[#f5f7fa] placeholder-[#6b7684] rounded focus:outline-none focus:ring-2 focus:ring-[#C41E3A]"
-            />
-          </div>
-          <div className="flex flex-col justify-end gap-2">
-            <button
-              onClick={handleSearch}
-              className="px-4 md:px-6 py-3 bg-[#C41E3A] hover:bg-[#A91930] text-white rounded font-semibold transition duration-200 shadow-md hover:shadow-lg"
-            >
-              Search
-            </button>
-            {hasSearched && (
-              <button
-                onClick={handleClearSearch}
-                className="px-4 md:px-6 py-2 bg-[#2d333f] hover:bg-[#3d444f] text-[#8b95a5] rounded font-medium transition text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
         </div>
-      </div>
 
-      {!hasSearched && (
-        <div className="bg-[#1a1f26] border border-[#2d333f] rounded-lg p-8 md:p-12 text-center">
-          <p className="text-[#8b95a5] text-base md:text-lg font-medium">Enter search criteria and click Search to find candidates</p>
-        </div>
-      )}
+        {/* Results Section */}
+        {!hasSearched && (
+          <div className="bg-[#1a1f26] border-2 border-dashed border-[#3d4551] rounded-xl p-12 text-center">
 
-      {isLoading && hasSearched ? (
-        <div className="text-center py-12">
-          <p className="text-[#8b95a5] text-lg">Loading candidates...</p>
-        </div>
-      ) : hasSearched && data?.candidates?.length > 0 ? (
-        <div className="bg-[#1a1f26] border border-[#2d333f] rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[#0f1419] border-b border-[#2d333f]">
-                  <th className="px-6 py-4 text-left font-semibold text-[#f5f7fa]">Name</th>
-                  <th className="px-6 py-4 text-left font-semibold text-[#f5f7fa]">Email</th>
-                  <th className="px-6 py-4 text-left font-semibold text-[#f5f7fa]">Skills</th>
-                  <th className="px-6 py-4 text-center font-semibold text-[#f5f7fa]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.candidates.map((candidate, idx) => (
-                  <tr key={candidate.id} className={`border-b border-[#2d333f] hover:bg-[#232a33] transition ${idx % 2 === 0 ? 'bg-[#1a1f26]' : 'bg-[#1f2530]'}`}>
-                    <td className="px-6 py-4 text-[#f5f7fa] font-medium">
-                      {candidate.first_name} {candidate.last_name}
-                    </td>
-                    <td className="px-6 py-4 text-[#8b95a5]">{candidate.email}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {candidate.skills?.slice(0, 3).map((skill, sidx) => (
-                          <span
-                            key={sidx}
-                            className="px-2 py-1 bg-[rgba(196,30,58,0.15)] text-[#FF6B7A] text-xs rounded"
-                          >
-                            {skill.name || skill}
-                          </span>
-                        ))}
-                        {candidate.skills?.length > 3 && (
-                          <span className="px-2 py-1 bg-[rgba(139,149,165,0.15)] text-[#8b95a5] text-xs rounded">
-                            +{candidate.skills.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => handleViewProfile(candidate.id)}
-                        className="px-4 py-3 bg-[#C41E3A] hover:bg-[#A91930] text-white text-sm rounded font-semibold transition"
-                      >
-                        View Profile
-                      </button>
-                    </td>
+            <p className="text-[#8b95a5] text-lg font-medium">Enter search criteria to discover qualified candidates</p>
+            <p className="text-[#6d7a88] text-sm mt-2">Refine your search using multiple filters for best results</p>
+          </div>
+        )}
+
+        {isLoading && hasSearched ? (
+          <div className="text-center py-16">
+            <div className="inline-block w-8 h-8 border-4 border-[#2d333f] border-t-[#8B2635] rounded-full animate-spin mb-4"></div>
+            <p className="text-[#8b95a5] text-lg font-medium">Loading candidates...</p>
+          </div>
+        ) : hasSearched && data?.candidates?.length > 0 ? (
+          <div className="bg-[#1a1f26] border border-[#2d333f] rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-[#0f1419] border-b border-[#2d333f]">
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-bold text-[#f5f7fa] uppercase tracking-wide">
+                      Candidate
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-bold text-[#f5f7fa] uppercase tracking-wide">
+                      Email
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-bold text-[#f5f7fa] uppercase tracking-wide">
+                      Top Skills
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-center text-xs sm:text-sm font-bold text-[#f5f7fa] uppercase tracking-wide">
+                      Action
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.candidates.map((candidate, idx) => (
+                    <tr 
+                      key={candidate.id} 
+                      className="border-b border-[#2d333f] hover:bg-[#0f1419] transition"
+                    >
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-white font-bold text-base sm:text-lg">
+                        {candidate.first_name} {candidate.last_name}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-[#d0d8e0] font-medium text-sm sm:text-base">{candidate.email}</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <div className="flex flex-wrap gap-1 sm:gap-2">
+                          {candidate.skills?.slice(0, 3).map((skill, sidx) => (
+                            <span
+                              key={sidx}
+                              className="px-2 sm:px-3 py-0.5 sm:py-1 bg-[#5C1520] text-[#C41E3A] text-xs font-medium rounded-full border border-[#8B2635]"
+                            >
+                              {skill.name || skill}
+                            </span>
+                          ))}
+                          {candidate.skills?.length > 3 && (
+                            <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-[#2d333f] text-[#8b95a5] text-xs font-medium rounded-full">
+                              +{candidate.skills.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
+                        <button
+                          onClick={() => handleViewProfile(candidate.id)}
+                          style={{ backgroundColor: '#C41E3A' }}
+                          className="px-3 sm:px-4 py-1.5 sm:py-2 hover:opacity-90 text-white text-xs sm:text-sm rounded-lg font-semibold transition-all duration-200 transform hover:shadow-md active:scale-95"
+                        >
+                          View Profile
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Results Summary */}
+            <div className="bg-[#0f1419] border-t border-[#2d333f] px-6 py-4">
+              <p className="text-sm text-[#8b95a5]">
+                Showing <span className="font-semibold text-[#f5f7fa]">{data.candidates.length}</span> candidate{data.candidates.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
-        </div>
-      ) : hasSearched ? (
-        <div className="bg-[#1a1f26] border border-[#2d333f] rounded-lg shadow p-12 text-center">
-          <div className="text-[#2d333f] text-5xl mb-4">🔍</div>
-          <h3 className="text-lg font-semibold text-[#f5f7fa] mb-2">No candidates found</h3>
-          <p className="text-[#8b95a5] mb-4">
-            No candidates with parsed resumes match your search criteria.
-          </p>
-          <p className="text-sm text-[#6b7684]">
-            💡 Try adjusting your search criteria or check back later as more candidates upload their resumes.
-          </p>
-        </div>
-      ) : null}
+        ) : hasSearched ? (
+          <div className="bg-[#1a1f26] border border-[#2d333f] rounded-xl p-12 text-center">
+            <h3 className="text-lg font-bold text-[#f5f7fa] mb-2">No candidates found</h3>
+            <p className="text-[#8b95a5] mb-4">
+              We couldn't find any candidates matching your criteria.
+            </p>
+            <p className="text-sm text-[#6d7a88]">
+              Try adjusting your search filters or check back later as new candidates join
+            </p>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };
+
+export default RecruiterDashboard;
